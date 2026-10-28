@@ -23,13 +23,15 @@ crates/envcore/        Platform core: plain Rust, no Tauri, fully unit-tested
   src/profiles.rs        Profiles: apply as user or temporary, turn off restores previous values
   src/path_editor.rs     Safe PATH editor: your entries only, around the inherited/system PATH
   src/validate.rs        Name rules, secret detection, missing-path checks
-src-tauri/             Tauri app (binary `varden`): commands.rs wraps the core API
+src-tauri/             Tauri app (binary `varden`): commands.rs wraps the core API, tray.rs the tray icon
+  windows/hooks.nsh      Extra uninstaller steps (removes terminal sync from shell profiles)
 src/                   React + Tailwind v4 frontend
   lib/api.ts             Typed wrappers for every Tauri command
   lib/useEnvironment.ts  Owns all data and mutations; the table is always replaced by what the backend returns
   lib/filter.ts          Pure search, filter and sort logic (unit-tested with Vitest)
   lib/pathEdit.ts        PATH editor list logic: moves, validation, diff (unit-tested)
   lib/theme.ts           Light/dark theme following the system, with a manual override
+  lib/useUpdates.ts      Update check at startup and from Settings (tauri-plugin-updater)
   components/            Pages (Variables, Profiles, Shells, Backups), modals, table, toasts
 ```
 
@@ -92,7 +94,7 @@ The sections below were written as each stage landed. They explain behaviour in 
 
 - **One instance.** Launching the app while it's already running brings the open window to the front instead of starting a second copy, so two windows can never write at the same time.
 - **Automatic refresh.** Changes made outside the app (`setx`, the Windows dialog, an editor saving `.zshrc`) show up on their own. On Windows the app subscribes to change notifications for `HKCU\Environment`. On every platform it watches the folders that hold the startup files, which also catches editors that save by replacing the file. Bursts of events become one refresh, and the echo of the app's own writes is ignored. The window also refreshes when it regains focus, and a notice appears when something changed.
-- **Log file.** Diagnostics are written to `%LOCALAPPDATA%\VARden\logs` (macOS `~/Library/Application Support/VARden/logs`, Linux `~/.local/share/VARden/logs`): at most 5 files of 1 MB each. Logs contain variable names and actions, never values. **Open log folder** in the sidebar opens it.
+- **Log file.** Diagnostics are written to `%LOCALAPPDATA%\VARden\logs` (macOS `~/Library/Application Support/VARden/logs`, Linux `~/.local/share/VARden/logs`): at most 5 files of 1 MB each. Logs contain variable names and actions, never values. **Settings > Open log folder** opens it.
 - **CI.** Every push runs formatting, clippy, Rust and frontend tests and a full app build on Windows, macOS and Linux, including the terminal hook in real bash, zsh, fish and PowerShell.
 
 ### Stage 2: validation
@@ -122,6 +124,14 @@ The sections below were written as each stage landed. They explain behaviour in 
 - **Calmer layout.** One header style on every page, the same width everywhere, grouped actions (Edit PATH, a `.env` menu, Sync, New variable), compact status filters instead of the coloured bar, row actions that appear on hover, sidebar icons, and shell cards that show a file's name with its folder underneath.
 - **Fix:** a value that is a folder followed by a separator (JetBrains installers write `IntelliJ IDEA` = `C:\...\bin;` and add `%IntelliJ IDEA%` to PATH) is no longer flagged as missing.
 
+### Stage 5: release
+
+- **Installers.** `bundle.targets` builds an NSIS installer on Windows (per-user, `installMode: currentUser`, so no UAC prompt), a universal `.dmg` on macOS, and `.deb`, `.rpm` and `.AppImage` on Linux. See [RELEASING.md](RELEASING.md).
+- **Uninstaller.** `src-tauri/windows/hooks.nsh` runs `varden.exe --uninstall-cleanup` before uninstalling (not during updates). That flag is handled before the single-instance check and removes the terminal-sync section from every detected shell profile, backing each up first. If "Delete the application data" is ticked, `%LOCALAPPDATA%\VARden` is removed afterwards. Tauri's own uninstaller already removes the autostart entry.
+- **Updates.** `tauri-plugin-updater` reads `latest.json` from the latest GitHub release. Updates are verified against `plugins.updater.pubkey`; the release workflow signs them with the `TAURI_SIGNING_PRIVATE_KEY` secret. The check runs at startup unless turned off, and only ever reports; downloading needs a click. On Windows the update installs in passive mode and the app restarts.
+- **Tray.** `src-tauri/src/tray.rs`: left click opens the window; the menu has Open, Sync to terminals, start with the computer (a checkmark kept in step with Settings), and Quit. Closing the window hides it when "Keep running in the tray" is on and a tray exists (some Linux desktops have none). The window is created hidden and shown in `setup`, so starting with the computer (`--minimized`) never flashes it; the window-state plugin restores size and position but not visibility.
+- **Settings page.** Theme, start with the computer (`tauri-plugin-autostart`), close to tray and update checks (`settings.json`, `prefs`), version and update controls, links and logs.
+
 ### Renamed to VARden
 
 Earlier builds were called *Environment Manager*. On first start, VARden moves their data (backups including originals, sync state, hook scripts) from `%LOCALAPPDATA%\EnvManager` into `%LOCALAPPDATA%\VARden` and removes the old folder. Blocks in startup files written with the old `ENVMANAGER` markers are still recognised and are rewritten with `VARDEN` markers on the next change. Installed terminal-sync hooks are updated to the new location right away, with a backup first.
@@ -136,4 +146,4 @@ Earlier builds were called *Environment Manager*. On first start, VARden moves t
 
 Defined in `src-tauri/src/commands.rs`, typed for the frontend in `src/lib/api.ts`:
 
-`get_platform_info`, `list_variables`, `set_variable`, `delete_variable`, `detect_shells`, `get_shell_targets`, `set_shell_targets`, `list_backups`, `preview_restore`, `restore_backup`, `delete_backups`, `get_terminal_sync`, `install_terminal_hook`, `remove_terminal_hook`, `sync_terminals`, `read_env_file`, `import_variables`, `export_env_file`, `open_logs_folder`, `list_profiles`, `save_profile`, `delete_profile`, `apply_profile`, `deactivate_profile`, `delete_variables`, `rename_variable`, `get_path_info`, `check_path_entries`, `set_user_path`, `recent_export_folders`. Each mutation returns the refreshed variable list plus the backups it created.
+`get_platform_info`, `list_variables`, `set_variable`, `delete_variable`, `detect_shells`, `get_shell_targets`, `set_shell_targets`, `list_backups`, `preview_restore`, `restore_backup`, `delete_backups`, `get_terminal_sync`, `install_terminal_hook`, `remove_terminal_hook`, `sync_terminals`, `read_env_file`, `import_variables`, `export_env_file`, `open_logs_folder`, `list_profiles`, `save_profile`, `delete_profile`, `apply_profile`, `deactivate_profile`, `get_app_prefs`, `set_app_prefs`, `get_autostart`, `set_autostart`, `delete_variables`, `rename_variable`, `get_path_info`, `check_path_entries`, `set_user_path`, `recent_export_folders`. Each mutation returns the refreshed variable list plus the backups it created.

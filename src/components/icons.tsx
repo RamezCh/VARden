@@ -168,3 +168,10 @@ export const PathIcon = (p: P) => (
     <circle cx="12.5" cy="12" r="1.2" />
   </svg>
 );
+export const SettingsIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6" />
+    <circle cx="10" cy="4.5" r="1.5" />
+    <circle cx="6" cy="11.5" r="1.5" />
+  </svg>
+);

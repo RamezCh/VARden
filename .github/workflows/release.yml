@@ -1,0 +1,91 @@
+name: Release
+
+# Builds the installers for Windows, macOS and Linux and attaches them to a
+# draft GitHub release, together with the signed update files the app's
+# auto-updater reads (latest.json). Publish the draft by hand once it looks
+# right; installed copies of VARden then offer the update.
+#
+# Run it by pushing a version tag (git tag v0.2.0 && git push origin v0.2.0)
+# or from the Actions tab ("Run workflow").
+#
+# Needs two repository secrets (Settings > Secrets and variables > Actions):
+#   TAURI_SIGNING_PRIVATE_KEY           the private update key (see docs/RELEASING.md)
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  its password
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Windows, os: windows-latest, args: "" }
+          - { name: macOS, os: macos-latest, args: "--target universal-apple-darwin" }
+          - { name: Linux, os: ubuntu-22.04, args: "" }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the update key is set up
+        shell: bash
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::The TAURI_SIGNING_PRIVATE_KEY secret is missing. See docs/RELEASING.md."
+            exit 1
+          fi
+          if ! grep -q '"pubkey": "[^"]' src-tauri/tauri.conf.json; then
+            echo "::error::plugins.updater.pubkey in src-tauri/tauri.conf.json is empty. See docs/RELEASING.md."
+            exit 1
+          fi
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install npm packages
+        run: npm ci
+
+      - name: Build installers and attach them to a draft release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: v__VERSION__
+          releaseName: VARden __VERSION__
+          releaseBody: |
+            See the [README](https://github.com/RamezCh/VARden#install) for which file to download.
+            Installed copies of VARden offer this update on their own once the release is published.
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true
+          args: ${{ matrix.args }} --config {"bundle":{"createUpdaterArtifacts":true}}

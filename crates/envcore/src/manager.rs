@@ -47,6 +47,27 @@ struct Settings {
     /// Folders .env files were last exported to, newest first.
     #[serde(default)]
     recent_export_dirs: Vec<PathBuf>,
+    #[serde(default)]
+    prefs: AppPrefs,
+}
+
+/// Desktop behaviour the user can change on the Settings page.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct AppPrefs {
+    /// Closing the window keeps VARden in the tray (sync stays one click away).
+    pub close_to_tray: bool,
+    /// Look for a new version on GitHub when VARden starts.
+    pub check_for_updates: bool,
+}
+
+impl Default for AppPrefs {
+    fn default() -> Self {
+        AppPrefs {
+            close_to_tray: true,
+            check_for_updates: true,
+        }
+    }
 }
 
 /// How many recent export folders to remember.
@@ -508,6 +529,19 @@ impl EnvManager {
         fsutil::write_atomic(&self.settings_path, &serde_json::to_vec_pretty(&settings)?)
     }
 
+    // ----- app preferences -----
+
+    pub fn app_prefs(&self) -> AppPrefs {
+        self.load_settings().prefs
+    }
+
+    pub fn set_app_prefs(&self, prefs: AppPrefs) -> Result<AppPrefs> {
+        let mut settings = self.load_settings();
+        settings.prefs = prefs;
+        fsutil::write_atomic(&self.settings_path, &serde_json::to_vec_pretty(&settings)?)?;
+        Ok(prefs)
+    }
+
     // ----- recent export folders -----
 
     /// Folders .env files were recently exported to (newest first), skipping
@@ -925,6 +959,23 @@ mod tests {
         assert_eq!(names, ["p3", "p6", "p5", "p4", "p2"]);
         std::fs::remove_dir(dir.path().join("p6")).unwrap();
         assert_eq!(m.recent_export_dirs().len(), 4);
+    }
+
+    #[test]
+    fn app_prefs_default_and_persist() {
+        let (_dir, m) = setup();
+        assert_eq!(m.app_prefs(), AppPrefs::default());
+        let p = AppPrefs {
+            close_to_tray: false,
+            check_for_updates: true,
+        };
+        m.set_app_prefs(p).unwrap();
+        assert_eq!(m.app_prefs(), p);
+        // Other settings survive a prefs write.
+        let d = _dir.path().join("x");
+        std::fs::create_dir(&d).unwrap();
+        m.remember_export_dir(&d.join(".env")).unwrap();
+        assert_eq!(m.app_prefs(), p);
     }
 
     #[cfg(not(windows))]

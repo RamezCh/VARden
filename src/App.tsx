@@ -2,25 +2,26 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { BackupsView } from "./components/BackupsView";
 import { ExportModal } from "./components/ExportModal";
 import { ImportModal, type ImportSource } from "./components/ImportModal";
-import { BackupIcon, ProfilesIcon, RefreshIcon, TerminalIcon, VariablesIcon } from "./components/icons";
+import { BackupIcon, ProfilesIcon, RefreshIcon, SettingsIcon, TerminalIcon, VariablesIcon } from "./components/icons";
 import { IconButton } from "./components/IconButton";
 import { Help } from "./components/Help";
 import { HELP } from "./lib/helpText";
 import { ShellsView } from "./components/ShellsView";
 import { Toasts } from "./components/Toasts";
 import { VariablesView } from "./components/VariablesView";
-import { api, syncApi, type EnvVar, type PlatformInfo, type Profile } from "./lib/api";
+import { syncApi, type EnvVar, type PlatformInfo, type Profile } from "./lib/api";
 import { ProfileEditor } from "./components/ProfileEditor";
 import { PathEditor } from "./components/PathEditor";
 import { ProfilesView } from "./components/ProfilesView";
 import { fileName, pickEnvFile, pickExportPath, useFileDrop } from "./lib/files";
 import { useTheme } from "./lib/theme";
-import { ThemeSwitch } from "./components/ThemeSwitch";
+import { SettingsView } from "./components/SettingsView";
+import { useUpdates } from "./lib/useUpdates";
 import { Wordmark } from "./components/Wordmark";
 import { formatShort, useEnvironment } from "./lib/useEnvironment";
 import { useToasts } from "./lib/useToasts";
 
-type View = "variables" | "profiles" | "shells" | "backups";
+type View = "variables" | "profiles" | "shells" | "backups" | "settings";
 
 /** Short, human name for where variables are saved; the full path is the tooltip. */
 function storeShort(p: PlatformInfo | null): string {
@@ -44,6 +45,9 @@ export default function App() {
   const openBackups = useCallback(() => setView("backups"), []);
   const env = useEnvironment(push, openBackups);
   const theme = useTheme();
+  const openSettings = useCallback(() => setView("settings"), []);
+  const updates = useUpdates(push, openSettings);
+  const onError = useCallback((m: string) => push("error", m), [push]);
   const [creating, setCreating] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -83,7 +87,7 @@ export default function App() {
   const refreshRef = useRef(env.refresh);
   refreshRef.current = env.refresh;
   useEffect(() => {
-    const views: View[] = ["variables", "profiles", "shells", "backups"];
+    const views: View[] = ["variables", "profiles", "shells", "backups", "settings"];
     const search = () => {
       setView("variables");
       window.setTimeout(() => searchRef.current?.focus());
@@ -142,26 +146,17 @@ export default function App() {
         </div>
 
         <nav aria-label="Sections" className="mt-6 flex flex-col gap-0.5">
-          {nav.map((n) => {
-            const current = view === n.id;
-            return (
-              <button
-                key={n.id}
-                type="button"
-                aria-current={current ? "page" : undefined}
-                onClick={() => setView(n.id)}
-                title={`${n.label} (Ctrl+${n.shortcut})`}
-                className={`relative flex items-center gap-2.5 rounded-md px-2.5 py-[0.45rem] text-left text-[0.95rem] transition-colors ${
-                  current ? "bg-raised font-semibold text-fg" : "text-muted hover:bg-raised/60 hover:text-fg"
-                }`}
-              >
-                {current && <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-process" aria-hidden />}
-                <span className={current ? "text-process" : ""}>{n.icon}</span>
-                <span className="flex-1">{n.label}</span>
-                <span className="font-mono text-xs font-normal tabular-nums text-faint">{n.count}</span>
-              </button>
-            );
-          })}
+          {nav.map((n) => (
+            <NavButton
+              key={n.id}
+              current={view === n.id}
+              onClick={() => setView(n.id)}
+              icon={n.icon}
+              label={n.label}
+              title={`${n.label} (Ctrl+${n.shortcut})`}
+              count={n.count}
+            />
+          ))}
         </nav>
 
         <div className="mt-auto flex flex-col gap-3">
@@ -185,15 +180,14 @@ export default function App() {
               </IconButton>
             </div>
           </div>
-          <ThemeSwitch pref={theme.pref} onChange={theme.choose} />
-          <button
-            type="button"
-            className="self-start px-2.5 text-xs text-faint underline-offset-4 hover:text-fg hover:underline"
-            title="Diagnostic logs, useful when reporting a problem"
-            onClick={() => api.openLogsFolder().catch((e) => push("error", `Couldn't open the log folder: ${String(e)}`))}
-          >
-            Open log folder
-          </button>
+          <NavButton
+            current={view === "settings"}
+            onClick={() => setView("settings")}
+            icon={<SettingsIcon />}
+            label="Settings"
+            title="Settings (Ctrl+5)"
+            badge={updates.state.kind === "available" || updates.state.kind === "ready" ? "Update" : undefined}
+          />
         </div>
       </aside>
 
@@ -244,6 +238,9 @@ export default function App() {
               onSaveStartupFiles={env.saveStartupFiles}
               onError={(m) => push("error", m)}
             />
+          )}
+          {view === "settings" && (
+            <SettingsView platform={env.platform} theme={theme} updates={updates} onError={onError} />
           )}
           {view === "backups" && (
             <BackupsView
@@ -310,5 +307,41 @@ export default function App() {
 
       <Toasts toasts={toasts} onDismiss={dismiss} />
     </div>
+  );
+}
+
+function NavButton({
+  current,
+  onClick,
+  icon,
+  label,
+  title,
+  count,
+  badge,
+}: {
+  current: boolean;
+  onClick: () => void;
+  icon: ReactNode;
+  label: string;
+  title: string;
+  count?: number;
+  badge?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-current={current ? "page" : undefined}
+      onClick={onClick}
+      title={title}
+      className={`relative flex items-center gap-2.5 rounded-md px-2.5 py-[0.45rem] text-left text-[0.95rem] transition-colors ${
+        current ? "bg-raised font-semibold text-fg" : "text-muted hover:bg-raised/60 hover:text-fg"
+      }`}
+    >
+      {current && <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-process" aria-hidden />}
+      <span className={current ? "text-process" : ""}>{icon}</span>
+      <span className="flex-1">{label}</span>
+      {count !== undefined && <span className="font-mono text-xs font-normal tabular-nums text-faint">{count}</span>}
+      {badge && <span className="rounded-full bg-process/15 px-1.5 text-xs font-semibold text-process">{badge}</span>}
+    </button>
   );
 }

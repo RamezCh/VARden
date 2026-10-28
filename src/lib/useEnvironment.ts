@@ -126,6 +126,16 @@ export function useEnvironment(notify: Notify, openBackups: () => void) {
             notify("info", "Your variables were changed outside the app. The list is up to date.");
           }
         });
+        // Sync started from the tray icon: refresh and confirm it.
+        const offTray = await listen<{ pushed: number; hooksInstalled: number }>("tray-synced", async ({ payload }) => {
+          await refresh({ quiet: true });
+          notify(
+            "success",
+            payload.hooksInstalled > 0
+              ? `Synced from the tray. Open terminals pick up ${plural(payload.pushed, "variable")} at their next prompt.`
+              : "Synced from the tray, but no shell has terminal sync installed yet.",
+          );
+        });
         const offFocus = await getCurrentWindow().onFocusChanged(({ payload: focused }) => {
           if (focused && Date.now() - lastFocusRefresh > 3000) {
             lastFocusRefresh = Date.now();
@@ -134,6 +144,7 @@ export function useEnvironment(notify: Notify, openBackups: () => void) {
         });
         unlisten = () => {
           offChange();
+          offTray();
           offFocus();
         };
         if (cancelled) unlisten();

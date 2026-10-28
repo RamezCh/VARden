@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use envcore::backup::{BackupEntry, BackupOutcome, DeleteReport};
 use envcore::dotenv::{self, EnvEntry, ParsedEnv};
-use envcore::manager::{EnvManager, PlatformInfo, RestorePreview, ShellTarget};
+use envcore::manager::{AppPrefs, EnvManager, PlatformInfo, RestorePreview, ShellTarget};
 use envcore::model::{EnvVarView, Scope};
 use envcore::path_editor::PathInfo;
 use envcore::shells::{self, DetectedShell, ShellKind};
@@ -440,4 +440,53 @@ pub async fn deactivate_profile(mgr: State<'_, EnvManager>) -> CmdResult<Profile
         profiles: mgr.profiles(),
         backups,
     })
+}
+
+// ----- Settings page -----
+
+#[tauri::command]
+pub async fn get_app_prefs(mgr: State<'_, EnvManager>) -> CmdResult<AppPrefs> {
+    Ok(mgr.app_prefs())
+}
+
+#[tauri::command]
+pub async fn set_app_prefs(mgr: State<'_, EnvManager>, prefs: AppPrefs) -> CmdResult<AppPrefs> {
+    logged(format!("Settings: {prefs:?}"), mgr.set_app_prefs(prefs))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutostartInfo {
+    pub enabled: bool,
+    /// "Start with Windows", "Open at login", ...
+    pub label: &'static str,
+    /// Without a tray the app would start with an open window instead.
+    pub tray: bool,
+}
+
+#[tauri::command]
+pub async fn get_autostart(app: AppHandle) -> CmdResult<AutostartInfo> {
+    use tauri_plugin_autostart::ManagerExt;
+    Ok(AutostartInfo {
+        enabled: app.autolaunch().is_enabled().unwrap_or(false),
+        label: crate::tray::autostart_label(),
+        tray: crate::tray::is_available(&app),
+    })
+}
+
+#[tauri::command]
+pub async fn set_autostart(app: AppHandle, enabled: bool) -> CmdResult<AutostartInfo> {
+    use tauri_plugin_autostart::ManagerExt;
+    let launcher = app.autolaunch();
+    let result = if enabled {
+        launcher.enable()
+    } else {
+        launcher.disable()
+    };
+    logged(
+        format!("Start with the computer: {enabled}"),
+        result.map_err(|e| Error::Refused(format!("Couldn't change this setting: {e}"))),
+    )?;
+    crate::tray::set_autostart_checked(&app, launcher.is_enabled().unwrap_or(false));
+    get_autostart(app).await
 }

@@ -261,3 +261,27 @@ export const editApi = {
   setUserPath: (entries: string[], baseAt: number) => invoke<MutationResult>("set_user_path", { entries, baseAt }),
   recentExportFolders: () => invoke<string[]>("recent_export_folders"),
 };
+
+// ----- Stage 5: desktop settings -----
+
+export interface AppPrefs {
+  /** Closing the window keeps VARden in the tray. */
+  closeToTray: boolean;
+  /** Look for a new version when VARden starts. */
+  checkForUpdates: boolean;
+}
+
+export interface AutostartInfo {
+  enabled: boolean;
+  /** "Start with Windows", "Open at login", ... */
+  label: string;
+  /** False on desktops without a tray. */
+  tray: boolean;
+}
+
+export const settingsApi = {
+  prefs: () => invoke<AppPrefs>("get_app_prefs"),
+  setPrefs: (prefs: AppPrefs) => invoke<AppPrefs>("set_app_prefs", { prefs }),
+  autostart: () => invoke<AutostartInfo>("get_autostart"),
+  setAutostart: (enabled: boolean) => invoke<AutostartInfo>("set_autostart", { enabled }),
+};

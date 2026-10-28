@@ -154,7 +154,8 @@ Your folders are a list you can edit, reorder and check as you type. The system 
 - **`.env` import and export.** Drop a `.env` file on the window to import it: you see what's new, what would be replaced, and what can't be read, before anything is written. Export any selection to a `.env` file, with your last five export folders one click away.
 - **Rename and bulk actions.** Rename a variable in place; select several to export or delete together.
 - **Changes from elsewhere show up on their own.** Changes from `setx`, the Windows dialog or an editor saving `.zshrc` appear without a refresh.
-- **Light and dark themes** that follow your system, plus keyboard shortcuts: <kbd>Ctrl</kbd>+<kbd>F</kbd> search, <kbd>Ctrl</kbd>+<kbd>N</kbd> new variable, <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>4</kbd> switch pages, <kbd>Del</kbd> delete selected, <kbd>F5</kbd> reload.
+- **Lives in the tray.** Sync open terminals from the tray icon without opening the window, and optionally start VARden with your computer. Closing the window keeps it in the tray unless you turn that off in **Settings**.
+- **Light and dark themes** that follow your system, plus keyboard shortcuts: <kbd>Ctrl</kbd>+<kbd>F</kbd> search, <kbd>Ctrl</kbd>+<kbd>N</kbd> new variable, <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>5</kbd> switch pages, <kbd>Del</kbd> delete selected, <kbd>F5</kbd> reload.
 - **Help where you need it.** A small **?** next to every term that might be new explains it in plain words.
 
 ## How it works
@@ -231,8 +232,20 @@ flowchart LR
 
 ## Install
 
+Download the file for your system from the [latest release](https://github.com/RamezCh/VARden/releases/latest):
+
+| System | File | Notes |
+|---|---|---|
+| Windows 10 and 11 | `VARden_x.y.z_x64-setup.exe` | Installs for your account only, so it never asks for administrator rights. Adds VARden to the Start menu; the last page offers a desktop shortcut. |
+| macOS 11 or later | `VARden_x.y.z_universal.dmg` | Works on Apple Silicon and Intel Macs. |
+| Linux | `.AppImage`, `.deb` or `.rpm` | The AppImage updates itself; for `.deb` and `.rpm`, install the new package. |
+
+VARden checks for new versions when it starts (you can turn this off in **Settings**). Updates are signed, and VARden refuses any update whose signature doesn't match.
+
 > [!NOTE]
-> Ready-made installers for Windows, macOS and Linux arrive with the next release (see the [Roadmap](ROADMAP.md)). Until then, VARden is built from source, which takes a few minutes.
+> The installers aren't signed with a paid code-signing certificate yet, so Windows may show "Windows protected your PC" the first time. Click **More info**, then **Run anyway**.
+
+### Build from source
 
 1. Install [Rust](https://rustup.rs) and [Node.js 20+](https://nodejs.org). On Windows you also need the [Visual Studio C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) ("Desktop development with C++"). On Linux you need the [Tauri system packages](https://tauri.app/start/prerequisites/#linux).
 2. Build and run:
@@ -309,7 +322,7 @@ VARden stores values exactly where your operating system expects them: the Windo
 - Secrets are masked on screen and can be copied without being shown.
 - Masked values can't be found by searching.
 - The log file records variable *names*, never values.
-- Nothing is ever sent over the network.
+- Values are never sent anywhere. The only network request is the optional update check.
 </details>
 
 <details>
@@ -336,13 +349,15 @@ No. VARden only changes lines between its own markers and leaves everything else
 <details>
 <summary><b>What happens if I uninstall VARden?</b></summary>
 
-Your variables stay. They live in your account and your startup files, not inside VARden. The uninstaller planned for the next release will also remove the terminal-sync hooks from your shell profiles. Until then, remove them on the **Shells** page before uninstalling.
+Your variables stay. They live in your account and your startup files, not inside VARden.
+
+On Windows, the uninstaller also removes the terminal-sync lines from your shell profiles (backing each one up first) and the "Start with Windows" entry. If you tick **Delete the application data**, VARden's own folder (backups, logs) goes too. On macOS and Linux, remove terminal sync on the **Shells** page before deleting the app.
 </details>
 
 <details>
 <summary><b>Does VARden collect any data?</b></summary>
 
-No. There's no telemetry, no account and no network access. Diagnostic logs stay on your computer (**Open log folder** in the sidebar) and contain variable names and actions, never values.
+No. There's no telemetry and no account. The only thing VARden fetches from the internet is the update check on GitHub when it starts, and you can turn that off in **Settings**. Diagnostic logs stay on your computer (**Settings > Open log folder**) and contain variable names and actions, never values.
 </details>
 
 ## Roadmap
@@ -353,8 +368,8 @@ VARden is built in stages. See [ROADMAP.md](ROADMAP.md) for the full list.
 - [x] Terminal sync, `.env` import and export, restore preview
 - [x] Broken-path detection, profiles, custom startup files
 - [x] Safe PATH editor, rename, bulk actions, light and dark themes
-- [ ] **Next:** installers, an uninstaller that cleans up hooks, auto-updates, a tray icon
-- [ ] Launch: license and contributing guide
+- [x] Installers, an uninstaller that cleans up hooks, signed auto-updates, a tray icon, Settings
+- [ ] **Next:** license, contributing guide and the first published release
 
 ## Developing
 

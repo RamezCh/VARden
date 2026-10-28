@@ -17,7 +17,8 @@
         "width": 1180,
         "height": 760,
         "minWidth": 820,
-        "minHeight": 520
+        "minHeight": 520,
+        "visible": false
       }
     ],
     "security": {
@@ -26,13 +27,44 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "nsis",
+      "dmg",
+      "app",
+      "deb",
+      "rpm",
+      "appimage"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "publisher": "Ramez Chreide",
+    "copyright": "© 2026 Ramez Chreide",
+    "homepage": "https://github.com/RamezCh/VARden",
+    "category": "DeveloperTool",
+    "shortDescription": "Manage your environment variables safely",
+    "longDescription": "VARden shows all your user environment variables in one place, flags broken ones, edits PATH safely, keeps backups of every change and updates open terminals without restarting them.",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerHooks": "./windows/hooks.nsh",
+        "installerIcon": "icons/icon.ico"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": [
+        "https://github.com/RamezCh/VARden/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

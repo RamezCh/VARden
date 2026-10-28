@@ -179,6 +179,28 @@ impl EnvManager {
         Ok(updated)
     }
 
+    /// Remove terminal sync from every detected shell's profile (used by the
+    /// uninstaller). Each profile is backed up first. Returns the profiles
+    /// changed and the ones that couldn't be.
+    pub fn uninstall_all_hooks(&self) -> (Vec<PathBuf>, Vec<(PathBuf, Error)>) {
+        let mut removed = Vec::new();
+        let mut failed = Vec::new();
+        for s in shells::detect() {
+            let (Ok(_), Some(path)) = (hook_shell(s.kind), s.config_path) else {
+                continue;
+            };
+            if removed.contains(&path) || !path.exists() {
+                continue;
+            }
+            match self.uninstall_hook_from(&path) {
+                Ok(Some(_)) => removed.push(path),
+                Ok(None) => {}
+                Err(e) => failed.push((path, e)),
+            }
+        }
+        (removed, failed)
+    }
+
     pub fn uninstall_hook(&self, kind: ShellKind) -> Result<Option<BackupOutcome>> {
         let (_, path) = Self::detected(kind)?;
         self.uninstall_hook_from(&path)

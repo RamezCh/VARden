@@ -27,11 +27,13 @@ Phases 1–3 of the original spec (backend core, dashboard, terminal sync, `.env
 - [x] Up to 5 recent export folders.
 
 ## Stage 5: Release
-- [ ] Installer with a Start menu entry and an optional desktop shortcut.
-- [ ] Uninstaller that also removes the terminal-sync blocks from shell profiles.
-- [ ] Auto-updater fed by GitHub Releases.
-- [ ] Tray icon with Sync to terminals, and an optional "start with Windows".
+- [x] Installer with a Start menu entry and an optional desktop shortcut (per-user, no administrator rights). Pinning to the taskbar is left to the user: Windows doesn't let installers do it.
+- [x] Uninstaller that also removes the terminal-sync blocks from shell profiles.
+- [x] Auto-updater fed by GitHub Releases, with signed updates.
+- [x] Tray icon with Sync to terminals, and an optional "start with Windows".
+- [x] Settings page: theme, startup and tray, updates, about.
 
 ## Stage 6: Launch
 - [x] README with GIF and screenshots, comparison table, FAQ.
-- [ ] License, contributing guide, release workflow that publishes installers.
+- [x] Release workflow that builds installers for every platform into a draft release.
+- [ ] License, contributing guide, first published release.
