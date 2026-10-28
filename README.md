@@ -15,7 +15,11 @@ crates/envcore/        Platform core: plain Rust, no Tauri, fully unit-tested
   src/status.rs          Status pill logic (Active & Synced / Persistent Only / Process Only / Missing)
   src/manager.rs         EnvManager: the API the Tauri commands call
 src-tauri/             Tauri app: commands.rs wraps EnvManager
-src/                   React + Tailwind v4 frontend (src/lib/api.ts holds typed invoke wrappers)
+src/                   React + Tailwind v4 frontend
+  lib/api.ts             Typed wrappers for every Tauri command
+  lib/useEnvironment.ts  Owns all data and mutations; the table is always replaced by what the backend returns
+  lib/filter.ts          Pure search, filter and sort logic (unit-tested with Vitest)
+  components/            Dashboard: status strip, variable table, shells, backups, toasts
 ```
 
 ## Prerequisites (Windows)
@@ -31,6 +35,7 @@ src/                   React + Tailwind v4 frontend (src/lib/api.ts holds typed 
 npm install
 npm run tauri dev        # dev window with hot reload
 cargo test -p envcore    # core unit tests
+npm test                 # frontend unit tests
 npm run tauri build      # installer in target/release/bundle
 ```
 
@@ -43,6 +48,15 @@ npm run tauri build      # installer in target/release/bundle
 - **Backups.** Before every change, the app saves a copy of the file, or a JSON snapshot of all of `HKCU\Environment`, to `<app local data>/backups/<timestamp>/`. The first backup of each file (and of the registry) is its **original** state from before the app touched it, and it is never pruned. Only distinct states are kept: if the same content was already backed up, no new backup is written and the app says which existing backup already holds that state. Besides the original, the 50 newest backups per target are kept. Restoring a backup first backs up the current state, so a restore can itself be undone.
 - **Status semantics.** "Current" means the environment the app was launched with, plus any process-level variables set in the app. A variable you just saved therefore shows 🟡 *Persistent Only* until the app is restarted, because that is also true for terminals that are already open. For `PATH`, the status counts as synced when every user entry appears in the process PATH. (On Windows the process PATH is the system PATH plus the user PATH.)
 - **Windows uses only the registry.** PowerShell, cmd and Git Bash all inherit `HKCU\Environment`, so profile files are only detected, not written. On macOS and Linux the default target is your login shell's rc file, and `set_shell_targets` can add or swap files.
+
+## Phase 2: dashboard
+
+- **Status strip.** A proportional bar showing how your variables split across the four states. Click a state to filter the table; you can select several at once.
+- **Table.** Search, sorting by name, scope or status, a scope filter, inline editing, and a delete confirmation inside the row. The **N** key adds a variable and **/** jumps to search.
+- **Secrets.** Values that look sensitive are masked with a fixed-length mask, so their length isn't shown. Each has its own eye toggle, there's a global "Show secrets" switch, and values can be copied without being revealed. Search only matches values that are currently visible, so a masked secret can't be found by guessing.
+- **Session variables.** Editing a session variable lets you save it to your user environment. Moving a user variable to the session isn't offered, because that would quietly delete saved data.
+- **Notices.** Every change is confirmed with a toast. If no new backup was needed, a toast says which existing backup already holds that state.
+- **Font.** The interface uses Atkinson Hyperlegible Next and Mono, bundled with the app, so 0/O and 1/l/I in tokens can't be confused.
 
 ## Tauri commands
 

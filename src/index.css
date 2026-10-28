@@ -1,6 +1,76 @@
+/* Atkinson Hyperlegible: drawn so 0/O, 1/l/I and similar glyphs never look
+   alike, which matters when the content is API keys and tokens. Bundled
+   locally: the app works offline and the CSP allows no font CDN. */
+@import "@fontsource/atkinson-hyperlegible-next/400.css";
+@import "@fontsource/atkinson-hyperlegible-next/600.css";
+@import "@fontsource/atkinson-hyperlegible-mono/400.css";
+@import "@fontsource/atkinson-hyperlegible-mono/500.css";
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Atkinson Hyperlegible Next", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Atkinson Hyperlegible Mono", ui-monospace, Consolas, monospace;
+
+  /* Cool slate base; colour is reserved for the four statuses. */
+  --color-ink: #171b22;
+  --color-panel: #1e232c;
+  --color-raised: #272d38;
+  --color-rule: #2e3542;
+  --color-fg: #e4e7ec;
+  --color-muted: #959fae;
+  --color-faint: #687284;
+
+  --color-synced: #57c59a;
+  --color-persistent: #e5b34e;
+  --color-process: #6ca6ee;
+  --color-missing: #ec6b6b;
+}
 
 :root {
   color-scheme: dark;
-  font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ink);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-process);
+  outline-offset: 2px;
+}
+
+input[type="search"]::-webkit-search-cancel-button {
+  display: none;
+}
+
+/* The only motion: a toast arriving, so it's clear what just happened. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.toast-in {
+  animation: toast-in 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }
