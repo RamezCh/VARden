@@ -1,6 +1,8 @@
 import type { DetectedShell, HookStatus, PlatformInfo, ShellKind, TerminalSyncInfo } from "../lib/api";
 import { formatWhen } from "../lib/useEnvironment";
 import { Button } from "./IconButton";
+import { Help } from "./Help";
+import { HELP } from "../lib/helpText";
 
 interface Props {
   shells: DetectedShell[];
@@ -19,6 +21,7 @@ function SyncCell({ hook, busy, onSetHook }: { hook?: HookStatus; busy: boolean;
       <p className="flex items-center gap-2 text-sm">
         <span className={`h-2 w-2 rounded-full ${hook.installed ? "bg-synced" : "bg-faint"}`} />
         {hook.installed ? "Terminal sync installed" : "Terminal sync not installed"}
+        <Help label="What does installing terminal sync do?">{HELP.hook}</Help>
       </p>
       <Button
         variant={hook.installed ? "quiet" : "primary"}

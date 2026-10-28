@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use serde::{Deserialize, Serialize};
 
-use crate::backup::{BackupEntry, BackupOutcome, BackupStore, BackupTarget};
+use crate::backup::{BackupEntry, BackupOutcome, BackupStore, BackupTarget, DeleteReport};
 use crate::managed_block::{self, Syntax};
 use crate::model::{EnvVarView, Scope, StoredVar};
 use crate::status::{self, EnvSnapshot, StatusInput};
@@ -306,6 +306,12 @@ impl EnvManager {
 
     pub fn backups(&self) -> Result<Vec<BackupEntry>> {
         self.backups.list()
+    }
+
+    /// Delete backups by id; originals are always kept.
+    pub fn delete_backups(&self, ids: &[String]) -> Result<DeleteReport> {
+        let _guard = lock(&self.write_lock);
+        self.backups.delete(ids)
     }
 
     /// What restoring backup `id` would change, without changing anything.

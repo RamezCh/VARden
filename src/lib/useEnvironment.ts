@@ -138,7 +138,7 @@ export function useEnvironment(notify: Notify, openBackups: () => void) {
         () => api.setVariable(key, value, scope),
         scope === "user"
           ? `${existed ? "Updated" : "Saved"} ${key} in your user environment.`
-          : `Set ${key} for this session.`,
+          : `Set ${key} as temporary. Sync to push it into open terminals.`,
       ),
     [mutate],
   );
@@ -147,7 +147,7 @@ export function useEnvironment(notify: Notify, openBackups: () => void) {
     (key: string, scope: Scope) =>
       mutate(
         () => api.deleteVariable(key, scope),
-        scope === "user" ? `Deleted ${key} from your user environment.` : `Removed ${key} from this session.`,
+        scope === "user" ? `Deleted ${key} from your user environment.` : `Removed temporary ${key}. Open terminals drop it at the next sync.`,
       ),
     [mutate],
   );
@@ -163,7 +163,7 @@ export function useEnvironment(notify: Notify, openBackups: () => void) {
       mutate(
         () => syncApi.importVariables(entries, scope),
         `Imported ${plural(entries.length, "variable")} from ${source} ${
-          scope === "user" ? "into your user environment" : "for this session"
+          scope === "user" ? "into your user environment" : "as temporary variables"
         }.`,
       ),
     [mutate],
@@ -178,6 +178,26 @@ export function useEnvironment(notify: Notify, openBackups: () => void) {
         if (report.skipped.length > 0) {
           notify("info", `Left out ${report.skipped.map(([k, why]) => `${k} (${why})`).join(", ")}.`);
         }
+        return true;
+      } catch (e) {
+        fail(e);
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [notify, fail],
+  );
+
+  /** Delete backups; originals are always kept by the backend. */
+  const deleteBackups = useCallback(
+    async (ids: string[]): Promise<boolean> => {
+      setBusy(true);
+      try {
+        const { report, backups: left } = await api.deleteBackups(ids);
+        setBackups(left);
+        const kept = report.keptOriginals > 0 ? ` The original${report.keptOriginals === 1 ? " was" : "s were"} kept.` : "";
+        notify("success", `Deleted ${plural(report.deleted, "backup")}.${kept}`);
         return true;
       } catch (e) {
         fail(e);
@@ -252,6 +272,7 @@ export function useEnvironment(notify: Notify, openBackups: () => void) {
     setVariable,
     deleteVariable,
     restoreBackup,
+    deleteBackups,
     importVariables,
     exportVariables,
     syncTerminals,

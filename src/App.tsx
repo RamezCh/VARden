@@ -4,6 +4,8 @@ import { ExportModal } from "./components/ExportModal";
 import { ImportModal, type ImportSource } from "./components/ImportModal";
 import { RefreshIcon } from "./components/icons";
 import { IconButton } from "./components/IconButton";
+import { Help } from "./components/Help";
+import { HELP } from "./lib/helpText";
 import { ShellsView } from "./components/ShellsView";
 import { Toasts } from "./components/Toasts";
 import { VariablesView } from "./components/VariablesView";
@@ -116,7 +118,9 @@ export default function App() {
         </nav>
 
         <div className="mt-auto flex flex-col gap-2 px-2">
-          <p className="text-xs text-muted">Saving to</p>
+          <p className="flex items-center gap-1.5 text-xs text-muted">
+            Saving to <Help label="Where are variables saved?">{HELP.store}</Help>
+          </p>
           <p className="whitespace-pre-line font-mono text-xs leading-relaxed text-fg/80">
             {/* Allow line breaks only after path separators (zero-width space). */}
             {storeDescription(env.platform).replace(/([\\/])/g, "$1\u200B")}
@@ -165,7 +169,13 @@ export default function App() {
             />
           )}
           {view === "backups" && (
-            <BackupsView backups={env.backups} platform={env.platform} busy={env.busy} onRestore={env.restoreBackup} />
+            <BackupsView
+              backups={env.backups}
+              platform={env.platform}
+              busy={env.busy}
+              onRestore={env.restoreBackup}
+              onDelete={env.deleteBackups}
+            />
           )}
         </div>
       </main>

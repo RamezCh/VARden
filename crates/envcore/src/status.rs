@@ -97,7 +97,7 @@ pub fn literal_resolver(v: &StoredVar) -> Option<String> {
 
 pub struct StatusInput<'a> {
     pub persistent: &'a [StoredVar],
-    /// Process-level variables set inside the app this session.
+    /// Temporary variables set inside the app this session.
     pub overlay: &'a BTreeMap<String, String>,
     pub live: &'a EnvSnapshot,
     /// Keys a profile expects to exist; shown as Missing if absent.
@@ -114,24 +114,10 @@ pub fn compute(input: &StatusInput<'_>, resolve: Resolver<'_>) -> Vec<EnvVarView
             k.to_string()
         }
     };
-    let same_key = |a: &str, b: &str| {
-        if ci {
-            a.eq_ignore_ascii_case(b)
-        } else {
-            a == b
-        }
-    };
+    let current = |key: &str| input.live.get(key);
 
-    let overlay_get = |key: &str| {
-        input
-            .overlay
-            .iter()
-            .find(|(k, _)| same_key(k, key))
-            .map(|(_, v)| v.as_str())
-    };
-    let current = |key: &str| overlay_get(key).or_else(|| input.live.get(key));
-
-    let mut rows: BTreeMap<String, EnvVarView> = BTreeMap::new();
+    // A saved and a temporary variable may share a name; each gets a row.
+    let mut rows: BTreeMap<(String, u8), EnvVarView> = BTreeMap::new();
 
     for var in input.persistent {
         let cur = current(&var.key);
@@ -150,13 +136,15 @@ pub fn compute(input: &StatusInput<'_>, resolve: Resolver<'_>) -> Vec<EnvVarView
             }
         };
         rows.insert(
-            norm(&var.key),
+            (norm(&var.key), 0),
             EnvVarView {
                 key: var.key.clone(),
                 live_value: cur.filter(|c| *c != var.value).map(str::to_string),
                 sensitive: is_sensitive(&var.key, &var.value),
                 value: var.value.clone(),
                 scope: Scope::User,
+                // Shell expressions can't be pushed, so they're never pending.
+                pending_sync: status == Status::PersistentOnly && resolve(var).is_some(),
                 status,
                 kind: var.kind,
             },
@@ -164,23 +152,31 @@ pub fn compute(input: &StatusInput<'_>, resolve: Resolver<'_>) -> Vec<EnvVarView
     }
 
     for (key, value) in input.overlay {
-        rows.entry(norm(key)).or_insert_with(|| EnvVarView {
-            key: key.clone(),
-            value: value.clone(),
-            live_value: None,
-            scope: Scope::Process,
-            status: if value.is_empty() {
-                Status::MissingStale
-            } else {
-                Status::ProcessOnly
+        rows.insert(
+            (norm(key), 1),
+            EnvVarView {
+                key: key.clone(),
+                value: value.clone(),
+                live_value: None,
+                scope: Scope::Process,
+                status: if value.is_empty() {
+                    Status::MissingStale
+                } else {
+                    Status::ProcessOnly
+                },
+                kind: ValueKind::String,
+                sensitive: is_sensitive(key, value),
+                // Open terminals get it at the next sync.
+                pending_sync: current(key) != Some(value.as_str()),
             },
-            kind: ValueKind::String,
-            sensitive: is_sensitive(key, value),
-        });
+        );
     }
 
     for key in input.tracked {
-        rows.entry(norm(key)).or_insert_with(|| {
+        if rows.contains_key(&(norm(key), 0)) {
+            continue;
+        }
+        rows.entry((norm(key), 1)).or_insert_with(|| {
             let cur = current(key);
             EnvVarView {
                 key: key.clone(),
@@ -193,12 +189,13 @@ pub fn compute(input: &StatusInput<'_>, resolve: Resolver<'_>) -> Vec<EnvVarView
                 },
                 kind: ValueKind::String,
                 sensitive: is_sensitive(key, cur.unwrap_or_default()),
+                pending_sync: false,
             }
         });
     }
 
     let mut out: Vec<EnvVarView> = rows.into_values().collect();
-    out.sort_by_key(|r| r.key.to_ascii_lowercase());
+    out.sort_by_key(|r| (r.key.to_ascii_lowercase(), r.scope == Scope::Process));
     out
 }
 
@@ -296,10 +293,25 @@ mod tests {
     }
 
     #[test]
-    fn overlay_makes_persisted_var_synced() {
-        let rows = run(&[var("A", "2")], &[("A", "2")], &[("A", "1")], false);
-        assert_eq!(status_of(&rows, "A"), Status::ActiveSynced);
-        assert_eq!(rows.len(), 2); // A + tracked EXPECTED
+    fn temporary_and_saved_with_same_name_get_separate_rows() {
+        let rows = run(
+            &[var("A", "saved")],
+            &[("A", "temp")],
+            &[("A", "saved")],
+            false,
+        );
+        let a: Vec<(Scope, Status, bool)> = rows
+            .iter()
+            .filter(|r| r.key == "A")
+            .map(|r| (r.scope, r.status, r.pending_sync))
+            .collect();
+        assert_eq!(
+            a,
+            vec![
+                (Scope::User, Status::ActiveSynced, false),
+                (Scope::Process, Status::ProcessOnly, true),
+            ]
+        );
     }
 
     #[test]

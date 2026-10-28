@@ -77,6 +77,15 @@ impl std::ops::Deref for BackupOutcome {
     }
 }
 
+/// Result of deleting backups.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteReport {
+    pub deleted: usize,
+    /// Originals that were asked for but kept: they are never deleted.
+    pub kept_originals: usize,
+}
+
 #[derive(Debug, Clone)]
 pub struct BackupStore {
     root: PathBuf,
@@ -222,6 +231,29 @@ impl BackupStore {
             moved += 1;
         }
         Ok(moved)
+    }
+
+    /// Delete the given backups. Originals (each target's state from before
+    /// the app first changed it) are always kept; unknown ids are ignored.
+    pub fn delete(&self, ids: &[String]) -> Result<DeleteReport> {
+        let all = self.list()?;
+        let mut report = DeleteReport::default();
+        for id in ids {
+            Self::check_id(id)?;
+            let Some(entry) = all.iter().find(|e| &e.id == id) else {
+                continue;
+            };
+            if entry.original {
+                report.kept_originals += 1;
+                continue;
+            }
+            let dir = self.root.join(id);
+            // Remove meta.json first so a half-deleted folder is never listed.
+            fs::remove_file(dir.join(META)).map_err(|e| Error::io(dir.join(META), e))?;
+            let _ = fs::remove_dir_all(&dir);
+            report.deleted += 1;
+        }
+        Ok(report)
     }
 
     /// All complete backups, newest first.
@@ -451,5 +483,35 @@ mod tests {
         assert!(listed.iter().any(|e| e.id == original.id && e.original));
         assert!(old.list().unwrap().is_empty());
         assert_eq!(new.adopt_from(&dir.path().join("missing")).unwrap(), 0);
+    }
+
+    #[test]
+    fn delete_keeps_originals() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = BackupStore::new(dir.path().join("b"));
+        let rc = dir.path().join(".bashrc");
+        let mut ids = Vec::new();
+        for i in 0..3 {
+            fs::write(&rc, format!("v{i}")).unwrap();
+            ids.push(store.backup_file(&rc, "x").unwrap().id.clone());
+        }
+        let report = store
+            .delete(&[ids[0].clone(), ids[1].clone(), "missing".to_string()])
+            .unwrap();
+        assert_eq!(
+            report,
+            DeleteReport {
+                deleted: 1,
+                kept_originals: 1
+            }
+        );
+        let left: Vec<String> = store.list().unwrap().into_iter().map(|e| e.id).collect();
+        assert_eq!(left, vec![ids[2].clone(), ids[0].clone()]);
+        assert!(store
+            .list()
+            .unwrap()
+            .iter()
+            .any(|e| e.id == ids[0] && e.original));
+        assert!(store.delete(&["../x".to_string()]).is_err());
     }
 }

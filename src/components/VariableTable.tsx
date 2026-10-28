@@ -5,6 +5,8 @@ import { Button, IconButton } from "./IconButton";
 import { EyeIcon, EyeOffIcon, PencilIcon, SortIcon, TrashIcon } from "./icons";
 import { SecretValue } from "./SecretValue";
 import { StatusPill } from "./StatusStrip";
+import { Help } from "./Help";
+import { HELP } from "../lib/helpText";
 
 // One grid for header and rows. Below `lg` each row stacks:
 //   key ............ actions
@@ -20,10 +22,10 @@ const C = {
   actions: "order-2 flex items-center justify-end gap-1 lg:order-none",
 };
 
-const SCOPE_LABEL: Record<Scope, string> = { user: "User", process: "Session" };
+const SCOPE_LABEL: Record<Scope, string> = { user: "User", process: "Temporary" };
 const SCOPE_HELP: Record<Scope, string> = {
-  user: "Saved for your user account and kept after restart.",
-  process: "Only exists while this app is open.",
+  user: "Saved for your account. New terminals and programs get it, also after a restart.",
+  process: "Never saved. Pushed into open terminals when you sync.",
 };
 
 const input =
@@ -70,8 +72,14 @@ export function VariableTable(props: TableProps) {
       <div role="row" className={`${ROW} hidden border-b border-rule text-[0.8rem] text-muted lg:grid`}>
         {header("Name", "key", "")}
         {header("Value", null, "")}
-        {header("Scope", "scope", "")}
-        {header("Status", "status", "")}
+        <div className="flex items-center gap-1.5">
+          {header("Scope", "scope", "")}
+          <Help label="What does scope mean?">{HELP.scope}</Help>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {header("Status", "status", "")}
+          <Help label="What do the statuses mean?">{HELP.status}</Help>
+        </div>
         <div role="columnheader" className="sr-only">
           Actions
         </div>
@@ -206,12 +214,12 @@ function ScopeSelect({ value, onChange, disabled }: { value: Scope; onChange: (s
       aria-label="Scope"
       value={value}
       disabled={disabled}
-      title={disabled ? "To move a saved variable to the session, delete it and add it again." : SCOPE_HELP[value]}
+      title={disabled ? "To make a saved variable temporary, delete it and add it again as Temporary." : SCOPE_HELP[value]}
       onChange={(e) => onChange(e.target.value as Scope)}
       className="h-8 w-full rounded-md border border-rule bg-ink px-1.5 text-sm text-fg focus:border-process focus:outline-none disabled:opacity-60"
     >
       <option value="user">User</option>
-      <option value="process">Session</option>
+      <option value="process">Temporary</option>
     </select>
   );
 }
@@ -228,7 +236,7 @@ const enterEscape = (save: () => void, cancel: () => void) => (e: KeyboardEvent)
 
 function EditRow({ v, busy, onSet, onDone }: TableProps & { v: EnvVar; onDone: () => void }) {
   const [value, setValue] = useState(v.value);
-  // A session variable can be promoted to user scope; the reverse would
+  // A temporary variable can be promoted to user scope; the reverse would
   // silently delete saved data, so it isn't offered here.
   const [scope, setScope] = useState<Scope>(v.scope);
   const save = async () => {
@@ -276,7 +284,7 @@ function ConfirmDeleteRow({ v, busy, onDelete, onDone }: TableProps & { v: EnvVa
       <div role="cell" className={`${C.value} text-sm lg:col-span-3`}>
         {v.scope === "user"
           ? "Delete from your user environment? A backup is saved first, so you can restore it."
-          : "Remove from this session?"}
+          : "Remove this temporary variable? Open terminals drop it at the next sync."}
       </div>
       <div role="cell" className={C.actions}>
         <Button variant="quiet" data-cancel onClick={onDone}>

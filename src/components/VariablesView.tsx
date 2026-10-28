@@ -4,6 +4,8 @@ import { countByStatus, filterVars, rowId, sortVars, type ScopeFilter, type Sort
 import { Button } from "./IconButton";
 import { EyeIcon, EyeOffIcon, PlusIcon, SearchIcon, SyncIcon } from "./icons";
 import { StatusStrip } from "./StatusStrip";
+import { Help } from "./Help";
+import { HELP } from "../lib/helpText";
 import { VariableTable } from "./VariableTable";
 
 interface Props {
@@ -26,7 +28,7 @@ interface Props {
 const SCOPES: { value: ScopeFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "user", label: "User" },
-  { value: "process", label: "Session" },
+  { value: "process", label: "Temporary" },
 ];
 
 export function VariablesView({
@@ -57,7 +59,7 @@ export function VariablesView({
   // Counts follow the scope filter, so the strip always describes what the
   // status buttons would show.
   const counts = countByStatus(vars.filter((v) => scope === "all" || v.scope === scope));
-  const pending = vars.filter((v) => v.scope === "user" && v.status === "persistentOnly").length;
+  const pending = vars.filter((v) => v.pendingSync).length;
   const rows = sortVars(filterVars(vars, { query, scope, statuses }, isVisible), sort);
   const filtered = query.trim() !== "" || scope !== "all" || statuses.size > 0;
 
@@ -101,7 +103,7 @@ export function VariablesView({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold">Variables</h1>
-          <p className="mt-1 text-sm text-muted">Your user-level variables, plus any set for this session.</p>
+          <p className="mt-1 text-sm text-muted">Your saved user variables, plus temporary ones for open terminals.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={onOpenImport}>Import .env</Button>
@@ -109,6 +111,7 @@ export function VariablesView({
             Export .env
           </Button>
           {hooksInstalled > 0 ? (
+            <>
             <Button
               className="border border-rule"
               onClick={onSync}
@@ -118,14 +121,24 @@ export function VariablesView({
               <SyncIcon />
               Sync to terminals
               {pending > 0 && (
-                <span className="ml-0.5 rounded-full bg-persistent/20 px-1.5 font-mono text-xs text-persistent">{pending}</span>
+                <span
+                  className="ml-0.5 rounded-full bg-persistent/20 px-1.5 font-mono text-xs text-persistent"
+                  title={`${pending} change${pending === 1 ? "" : "s"} not in open terminals yet`}
+                >
+                  {pending}
+                </span>
               )}
             </Button>
+            <Help label="What does Sync to terminals do?">{HELP.sync}</Help>
+            </>
           ) : (
+            <>
             <Button className="border border-rule" onClick={onSetUpSync} title="Install the terminal hook for your shells">
               <SyncIcon />
               Set up terminal sync
             </Button>
+            <Help label="What is terminal sync?">{HELP.sync}</Help>
+            </>
           )}
           <Button variant="primary" onClick={() => setCreating(true)} disabled={creating} title="New variable (N)">
             <PlusIcon /> New variable

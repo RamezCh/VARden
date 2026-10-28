@@ -10,6 +10,7 @@ const v = (key: string, over: Partial<EnvVar> = {}): EnvVar => ({
   status: "activeSynced",
   kind: "string",
   sensitive: false,
+  pendingSync: false,
   ...over,
 });
 

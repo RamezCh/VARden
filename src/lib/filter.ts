@@ -11,12 +11,12 @@ export const STATUS_META: Record<Status, { label: string; help: string; color: s
   },
   persistentOnly: {
     label: "Persistent only",
-    help: "Saved, but not loaded yet. New terminals will pick it up.",
+    help: "Saved, but terminals that are already open don't have it yet. New ones do, and Sync updates open ones.",
     color: "var(--color-persistent)",
   },
   processOnly: {
-    label: "Process only",
-    help: "Set for this session only. Gone when the app closes.",
+    label: "Temporary",
+    help: "Never saved. Pushed into open terminals when you sync.",
     color: "var(--color-process)",
   },
   missingStale: {

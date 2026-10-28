@@ -6,6 +6,8 @@ import { plural } from "../lib/useEnvironment";
 import { Button } from "./IconButton";
 import { Modal } from "./Modal";
 import { SecretValue } from "./SecretValue";
+import { Help } from "./Help";
+import { HELP } from "../lib/helpText";
 
 export interface ImportSource {
   path: string;
@@ -103,7 +105,9 @@ export function ImportModal({ source, vars, caseInsensitive, busy, onChooseFile,
       ) : (
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span className="text-muted">Save to</span>
+            <span className="flex items-center gap-1.5 text-muted">
+              Save as <Help label="User or temporary?">{HELP.scope}</Help>
+            </span>
             <div role="radiogroup" aria-label="Scope" className="flex rounded-md border border-rule bg-ink p-0.5">
               {(["user", "process"] as Scope[]).map((s) => (
                 <button
@@ -114,7 +118,7 @@ export function ImportModal({ source, vars, caseInsensitive, busy, onChooseFile,
                   onClick={() => setScope(s)}
                   className={`rounded px-3 py-1 ${scope === s ? "bg-raised text-fg" : "text-muted hover:text-fg"}`}
                 >
-                  {s === "user" ? "User environment" : "This session only"}
+                  {s === "user" ? "User environment" : "Temporary"}
                 </button>
               ))}
             </div>

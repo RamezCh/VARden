@@ -59,7 +59,7 @@ npm run tauri build      # installer in target/release/bundle
 - **Status strip.** A proportional bar showing how your variables split across the four states. Click a state to filter the table; you can select several at once.
 - **Table.** Search, sorting by name, scope or status, a scope filter, inline editing, and a delete confirmation inside the row. The **N** key adds a variable and **/** jumps to search.
 - **Secrets.** Values that look sensitive are masked with a fixed-length mask, so their length isn't shown. Each has its own eye toggle, there's a global "Show secrets" switch, and values can be copied without being revealed. Search only matches values that are currently visible, so a masked secret can't be found by guessing.
-- **Session variables.** Editing a session variable lets you save it to your user environment. Moving a user variable to the session isn't offered, because that would quietly delete saved data.
+- **Temporary variables.** Never saved. **Sync to terminals** pushes them into open terminals that have terminal sync, where they win over a saved variable of the same name. Removing one drops it from those terminals at the next sync; new terminals and other programs never see them. Editing a temporary variable lets you save it to your user environment. Making a saved variable temporary isn't offered, because that would quietly delete saved data.
 - **Notices.** Every change is confirmed with a toast. If no new backup was needed, a toast says which existing backup already holds that state.
 - **Font.** The interface uses Atkinson Hyperlegible Next and Mono, bundled with the app, so 0/O and 1/l/I in tokens can't be confused.
 
@@ -74,6 +74,12 @@ npm run tauri build      # installer in target/release/bundle
 - **.env export.** Pick variables, preselected from what the table is currently showing, then choose where to save. You're warned when secrets would be written as plain text. Windows `%VAR%` values are written expanded.
 - **Recovery.** Before a restore, the Backups page lists exactly which variables would come back, change or be removed. Every change's toast has **Undo**. An error about a damaged managed block offers a shortcut to Backups.
 
+## Backups page and help
+
+- **Grouped by day.** Today, Yesterday, then dated groups. Each row shows the time and what the backup was taken before.
+- **Deleting.** You can delete one backup, a whole day, or everything with **Clear backups**. Each asks for confirmation first, and deleting can't be undone. The **original** of each file (or of the registry) is never deleted, in the UI or in the backend, so you can always return to the state from before the app was used.
+- **Help.** A small **?** next to terms people may not know (scope, statuses, terminal sync, the registry location, originals, `.env` files) explains them on hover, on keyboard focus, or on click.
+
 ## Tauri commands
 
-`get_platform_info`, `list_variables`, `set_variable`, `delete_variable`, `detect_shells`, `get_shell_targets`, `set_shell_targets`, `list_backups`, `preview_restore`, `restore_backup`, `get_terminal_sync`, `install_terminal_hook`, `remove_terminal_hook`, `sync_terminals`, `read_env_file`, `import_variables`, `export_env_file`. Each mutation returns the refreshed variable list plus the backups it created.
+`get_platform_info`, `list_variables`, `set_variable`, `delete_variable`, `detect_shells`, `get_shell_targets`, `set_shell_targets`, `list_backups`, `preview_restore`, `restore_backup`, `delete_backups`, `get_terminal_sync`, `install_terminal_hook`, `remove_terminal_hook`, `sync_terminals`, `read_env_file`, `import_variables`, `export_env_file`. Each mutation returns the refreshed variable list plus the backups it created.

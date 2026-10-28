@@ -4,6 +4,8 @@ import { rowId } from "../lib/filter";
 import { plural } from "../lib/useEnvironment";
 import { Button } from "./IconButton";
 import { Modal } from "./Modal";
+import { Help } from "./Help";
+import { HELP } from "../lib/helpText";
 
 interface Props {
   vars: EnvVar[];
@@ -34,7 +36,12 @@ export function ExportModal({ vars, initial, busy, onClose, onExport }: Props) {
       open
       onClose={onClose}
       title="Export to a .env file"
-      description="Pick the variables to write. You choose where to save next."
+      description={
+        <span className="flex items-center gap-1.5">
+          Pick the variables to write, then choose a folder, usually your project's.
+          <Help label="What is a .env file?">{HELP.dotenv}</Help>
+        </span>
+      }
       footer={
         <>
           {secrets > 0 && (
@@ -78,7 +85,7 @@ export function ExportModal({ vars, initial, busy, onClose, onExport }: Props) {
                 />
                 <span className="min-w-0 flex-1 truncate font-mono text-[0.9rem]">{v.key}</span>
                 {v.sensitive && <span className="text-xs text-persistent">Secret</span>}
-                <span className="w-16 text-right text-xs text-muted">{v.scope === "user" ? "User" : "Session"}</span>
+                <span className="w-16 text-right text-xs text-muted">{v.scope === "user" ? "User" : "Temporary"}</span>
               </label>
             </li>
           );

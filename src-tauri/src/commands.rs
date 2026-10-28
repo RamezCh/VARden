@@ -5,7 +5,7 @@
 
 use std::path::PathBuf;
 
-use envcore::backup::{BackupEntry, BackupOutcome};
+use envcore::backup::{BackupEntry, BackupOutcome, DeleteReport};
 use envcore::dotenv::{self, EnvEntry, ParsedEnv};
 use envcore::manager::{EnvManager, PlatformInfo, RestorePreview, ShellTarget};
 use envcore::model::{EnvVarView, Scope};
@@ -187,4 +187,23 @@ pub async fn export_env_file(
     items: Vec<ExportItem>,
 ) -> CmdResult<ExportReport> {
     mgr.export_env(&path, &items)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteBackupsResult {
+    pub report: DeleteReport,
+    pub backups: Vec<BackupEntry>,
+}
+
+#[tauri::command]
+pub async fn delete_backups(
+    mgr: State<'_, EnvManager>,
+    ids: Vec<String>,
+) -> CmdResult<DeleteBackupsResult> {
+    let report = mgr.delete_backups(&ids)?;
+    Ok(DeleteBackupsResult {
+        report,
+        backups: mgr.backups()?,
+    })
 }

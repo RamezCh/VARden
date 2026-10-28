@@ -15,6 +15,8 @@ export interface EnvVar {
   status: Status;
   kind: ValueKind;
   sensitive: boolean;
+  /** Sync to terminals would change what open terminals have for this row. */
+  pendingSync: boolean;
 }
 
 export type StoreInfo =
@@ -80,6 +82,8 @@ export const api = {
   setShellTargets: (targets: ShellTarget[]) => invoke<ShellTarget[]>("set_shell_targets", { targets }),
   listBackups: () => invoke<BackupEntry[]>("list_backups"),
   restoreBackup: (id: string) => invoke<MutationResult>("restore_backup", { id }),
+  deleteBackups: (ids: string[]) =>
+    invoke<{ report: { deleted: number; keptOriginals: number }; backups: BackupEntry[] }>("delete_backups", { ids }),
 };
 
 // ----- Phase 3: rollback preview, terminal sync, .env bridge -----

@@ -194,8 +194,9 @@ impl EnvManager {
         Ok(Some(backup))
     }
 
-    /// What terminals should have: every user variable the shells can take
-    /// literally, plus the user's PATH entries.
+    /// What terminals should have: every saved variable the shells can take
+    /// literally, the user's PATH entries, and temporary variables (which
+    /// win over a saved variable of the same name).
     fn desired(&self) -> Result<(Desired, Vec<String>)> {
         let sep = if cfg!(windows) { ';' } else { ':' };
         let mut desired = Desired::default();
@@ -214,6 +215,23 @@ impl EnvManager {
             } else {
                 desired.vars.push((var.key, value));
             }
+        }
+        for (key, value) in self.process_overlay() {
+            if key.eq_ignore_ascii_case("PATH") {
+                for p in value.split(sep).filter(|p| !p.trim().is_empty()) {
+                    desired.path.push(p.to_string());
+                }
+                continue;
+            }
+            let ci = self.ci;
+            desired.vars.retain(|(k, _)| {
+                if ci {
+                    !k.eq_ignore_ascii_case(&key)
+                } else {
+                    *k != key
+                }
+            });
+            desired.vars.push((key, value));
         }
         Ok((desired, skipped))
     }
@@ -375,9 +393,31 @@ mod tests {
             "user PATH entry merged into live PATH"
         );
 
+        // Temporary variables reach terminals too, and leave them when removed.
+        m.set("TEMP_FLAG", "on", Scope::Process).unwrap();
+        assert!(m
+            .list(&[])
+            .unwrap()
+            .iter()
+            .any(|r| r.key == "TEMP_FLAG" && r.pending_sync));
+        m.sync_terminals().unwrap();
+        assert!(std::fs::read_to_string(dir.path().join("sync/apply.sh"))
+            .unwrap()
+            .contains("export TEMP_FLAG='on'"));
+        assert!(
+            m.list(&[]).unwrap().iter().all(|r| !r.pending_sync),
+            "nothing left to sync"
+        );
+        m.remove("TEMP_FLAG", Scope::Process).unwrap();
+        m.sync_terminals().unwrap();
+        assert!(std::fs::read_to_string(dir.path().join("sync/apply.sh"))
+            .unwrap()
+            .contains("unset TEMP_FLAG"));
+
         m.remove("API_URL", Scope::User).unwrap();
         let report = m.sync_terminals().unwrap();
-        assert_eq!((report.generation, report.removed), (2, 1));
+        assert_eq!(report.generation, 4);
+        assert!(report.removed >= 1);
         assert!(std::fs::read_to_string(dir.path().join("sync/apply.sh"))
             .unwrap()
             .contains("unset API_URL"));

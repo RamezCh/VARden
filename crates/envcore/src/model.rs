@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 pub enum Scope {
     /// Persisted for the current user (HKCU\Environment or a shell rc file).
     User,
-    /// Only exists inside this app's session; gone when the app closes.
+    /// Temporary: kept by the app for this session and pushed into open
+    /// terminals by "Sync to terminals", but never saved.
     Process,
 }
 
@@ -59,4 +60,6 @@ pub struct EnvVarView {
     pub kind: ValueKind,
     /// Heuristic: should the UI mask this value by default?
     pub sensitive: bool,
+    /// "Sync to terminals" would change what open terminals have for this row.
+    pub pending_sync: bool,
 }

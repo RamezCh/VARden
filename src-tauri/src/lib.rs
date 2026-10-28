@@ -51,6 +51,7 @@ pub fn run() {
             commands::list_backups,
             commands::preview_restore,
             commands::restore_backup,
+            commands::delete_backups,
             commands::get_terminal_sync,
             commands::install_terminal_hook,
             commands::remove_terminal_hook,
