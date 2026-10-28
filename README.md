@@ -236,7 +236,7 @@ Download the file for your system from the [latest release](https://github.com/R
 
 | System | File | Notes |
 |---|---|---|
-| Windows 10 and 11 | `VARden_x.y.z_x64-setup.exe` | Installs for your account only, so it never asks for administrator rights. Adds VARden to the Start menu; the last page offers a desktop shortcut. |
+| Windows 10 and 11 | `VARden_x.y.z_x64-setup.exe` | Installs for your account only, so it never asks for administrator rights. Asks whether to add VARden to the Start menu and to the desktop. |
 | macOS 11 or later | `VARden_x.y.z_universal.dmg` | Works on Apple Silicon and Intel Macs. |
 | Linux | `.AppImage`, `.deb` or `.rpm` | The AppImage updates itself; for `.deb` and `.rpm`, install the new package. |
 

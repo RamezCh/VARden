@@ -6,6 +6,7 @@ import { formatWhen } from "../lib/useEnvironment";
 import { Button } from "./IconButton";
 import { MonitorIcon, MoonIcon, SunIcon } from "./icons";
 import { PageHeader } from "./PageHeader";
+import { openExternal as openLink, ReportProblem } from "./ReportProblem";
 import { Switch } from "./Switch";
 
 const REPO = "https://github.com/RamezCh/VARden";
@@ -45,20 +46,11 @@ const THEMES: { value: ThemePref; label: string; icon: ReactNode }[] = [
   { value: "dark", label: "Dark", icon: <MoonIcon /> },
 ];
 
-/** Opens in the default browser (in a plain browser, a new tab). */
-const openLink = async (url: string) => {
-  try {
-    const { openUrl } = await import("@tauri-apps/plugin-opener");
-    await openUrl(url);
-  } catch {
-    window.open(url, "_blank", "noopener");
-  }
-};
-
 export function SettingsView({ platform, theme, updates, onError }: Props) {
   const [prefs, setPrefs] = useState<AppPrefs | null>(null);
   const [autostart, setAutostart] = useState<AutostartInfo | null>(null);
   const [version, setVersion] = useState<string>("");
+  const [reporting, setReporting] = useState(false);
 
   useEffect(() => {
     settingsApi.prefs().then(setPrefs).catch(onError);
@@ -240,7 +232,7 @@ export function SettingsView({ platform, theme, updates, onError }: Props) {
               <Button variant="secondary" onClick={() => void openLink(REPO)}>
                 Website
               </Button>
-              <Button variant="secondary" onClick={() => void openLink(`${REPO}/issues/new`)}>
+              <Button variant="secondary" onClick={() => setReporting(true)}>
                 Report a problem
               </Button>
             </div>
@@ -256,6 +248,8 @@ export function SettingsView({ platform, theme, updates, onError }: Props) {
           }
         />
       </Section>
+
+      {reporting && <ReportProblem platform={platform} onClose={() => setReporting(false)} onError={onError} />}
     </div>
   );
 }

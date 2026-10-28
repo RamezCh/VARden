@@ -1,0 +1,15 @@
+name: Suggest an idea
+description: Something VARden could do better or should do next.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like VARden to do?
+      description: Describe the problem you're trying to solve, not just the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: How would it help you?

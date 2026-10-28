@@ -126,10 +126,11 @@ The sections below were written as each stage landed. They explain behaviour in 
 
 ### Stage 5: release
 
-- **Installers.** `bundle.targets` builds an NSIS installer on Windows (per-user, `installMode: currentUser`, so no UAC prompt), a universal `.dmg` on macOS, and `.deb`, `.rpm` and `.AppImage` on Linux. See [RELEASING.md](RELEASING.md).
+- **Installers.** `bundle.targets` builds an NSIS installer on Windows (per-user, `installMode: currentUser`, so no UAC prompt; `startMenuFolder` turns on the Start menu page, where "Do not create shortcuts" skips the entry), a universal `.dmg` on macOS, and `.deb`, `.rpm` and `.AppImage` on Linux. See [RELEASING.md](RELEASING.md).
 - **Uninstaller.** `src-tauri/windows/hooks.nsh` runs `varden.exe --uninstall-cleanup` before uninstalling (not during updates). That flag is handled before the single-instance check and removes the terminal-sync section from every detected shell profile, backing each up first. If "Delete the application data" is ticked, `%LOCALAPPDATA%\VARden` is removed afterwards. Tauri's own uninstaller already removes the autostart entry.
 - **Updates.** `tauri-plugin-updater` reads `latest.json` from the latest GitHub release. Updates are verified against `plugins.updater.pubkey`; the release workflow signs them with the `TAURI_SIGNING_PRIVATE_KEY` secret. The check runs at startup unless turned off, and only ever reports; downloading needs a click. On Windows the update installs in passive mode and the app restarts.
 - **Tray.** `src-tauri/src/tray.rs`: left click opens the window; the menu has Open, Sync to terminals, start with the computer (a checkmark kept in step with Settings), and Quit. Closing the window hides it when "Keep running in the tray" is on and a tray exists (some Linux desktops have none). The window is created hidden and shown in `setup`, so starting with the computer (`--minimized`) never flashes it; the window-state plugin restores size and position but not visibility.
+- **Report a problem.** Settings opens a short guide, then GitHub's issue form (`.github/ISSUE_TEMPLATE/bug_report.yml`) with version and OS filled in through the URL. The user attaches `varden.log` themselves: the app never uploads anything.
 - **Settings page.** Theme, start with the computer (`tauri-plugin-autostart`), close to tray and update checks (`settings.json`, `prefs`), version and update controls, links and logs.
 
 ### Renamed to VARden

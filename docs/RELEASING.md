@@ -6,7 +6,7 @@ Releases are built by GitHub Actions ([`.github/workflows/release.yml`](../.gith
 
 | Platform | Files | Notes |
 |---|---|---|
-| Windows | `VARden_x.y.z_x64-setup.exe` | Installs for the current user only, so it never asks for administrator rights. Adds a Start menu entry; the last page offers a desktop shortcut. |
+| Windows | `VARden_x.y.z_x64-setup.exe` | Installs for the current user only, so it never asks for administrator rights. A page asks whether to add a Start menu entry ("Do not create shortcuts" to skip), and the last page offers a desktop shortcut. |
 | macOS | `VARden_x.y.z_universal.dmg` | One build for Apple Silicon and Intel. |
 | Linux | `.AppImage`, `.deb`, `.rpm` | The AppImage updates itself; `.deb` and `.rpm` are updated by downloading the new package. |
 | All | `latest.json` and `.sig` files | Read by the app's auto-updater. Every update is signed, and the app refuses one whose signature doesn't match. |
