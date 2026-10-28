@@ -69,12 +69,16 @@ export const HELP: Record<string, ReactNode> = {
   hook: (
     <>
       <p>
-        Installing adds a short block, clearly marked, to this shell's startup file: the script the shell runs when it
-        starts. A backup of the file is saved first.
+        <strong>What it does:</strong> adds a few clearly marked lines to this shell's startup file (the script it runs
+        when a terminal opens). A backup of the file is saved first, and <em>Remove</em> takes the lines out again.
       </p>
       <p>
-        From then on, each terminal of this shell checks before every prompt whether you've clicked{" "}
-        <em>Sync to terminals</em>, and applies the change if so. Remove takes the block out again.
+        <strong>What it lets you do:</strong> click <em>Sync to terminals</em>, and every terminal of this shell that's
+        already open gets your changes before its next prompt. No need to close it or open a new one.
+      </p>
+      <p>
+        <strong>Without it:</strong> your saved variables still work, but only in terminals you open after the change.
+        Terminals that are already open keep the old values, and temporary variables never reach them.
       </p>
     </>
   ),

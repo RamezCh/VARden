@@ -1,129 +1,355 @@
-# VARden
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/banner-dark.svg">
+    <img src="docs/images/banner-light.svg" alt="VARden: environment variables, without the fear" width="820">
+  </picture>
+</p>
 
-[![CI](https://github.com/RamezCh/VARden/actions/workflows/ci.yml/badge.svg)](https://github.com/RamezCh/VARden/actions/workflows/ci.yml)
+<p align="center">
+  <b>A desktop app for your environment variables.</b><br>
+  See them all in one place, fix broken ones, edit PATH safely, and update open terminals without restarting them.
+</p>
 
-VARden is a Tauri 2 desktop app for managing **user-level** (persistent) and **temporary** environment variables (pushed into open terminals, never saved). It never writes system-level variables, so it never needs admin rights.
+<p align="center">
+  <a href="https://github.com/RamezCh/VARden/actions/workflows/ci.yml"><img src="https://github.com/RamezCh/VARden/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/Windows-supported-2563c9" alt="Windows">
+  <img src="https://img.shields.io/badge/macOS%20%7C%20Linux-supported-2563c9" alt="macOS and Linux">
+  <img src="https://img.shields.io/badge/admin%20rights-never%20needed-18855a" alt="No admin rights needed">
+  <img src="https://img.shields.io/badge/built%20with-Tauri%202%20%2B%20Rust-e5b34e" alt="Built with Tauri 2 and Rust">
+</p>
 
-## Layout
+<p align="center">
+  <img src="docs/images/demo.gif" alt="Filtering to broken variables, opening PATH, removing a folder that doesn't exist, adding one, reviewing the change, saving, and syncing open terminals" width="900">
+</p>
 
+---
+
+## Contents
+
+- [What are environment variables?](#what-are-environment-variables)
+- [Why VARden?](#why-varden)
+- [Features](#features)
+- [How it works](#how-it-works)
+- [Install](#install)
+- [Quick start](#quick-start)
+- [VARden compared](#varden-compared)
+- [FAQ](#faq)
+- [Roadmap](#roadmap) · [Developing](#developing)
+
+## What are environment variables?
+
+Environment variables are named settings that every program can read when it starts: `PATH` (where to find programs), `JAVA_HOME` (which Java to use), `OPENAI_API_KEY` (a key your scripts read instead of having it pasted into code). Installers, SDKs and tutorials constantly ask you to "add this to your environment".
+
+The trouble is that they're scattered and invisible:
+
+- **On Windows** they live in the registry, behind a small dialog several clicks deep, in one long `;`-separated line.
+- **On macOS and Linux** they're `export` lines spread across `.bashrc`, `.zshrc`, `config.fish` and friends.
+- **Terminals that are already open never notice changes.** You change a variable, run your command, and it still uses the old value until you close the terminal.
+- **Nothing tells you when one is broken**, for example `JAVA_HOME` pointing to a JDK you uninstalled last year, or a `PATH` folder that no longer exists.
+- **One wrong edit to `PATH`** and commands stop working, with no undo.
+
+## Why VARden?
+
+|  |  |
+|---|---|
+| 🛡️ **Safe by design** | Only *your* variables are ever changed, never system ones, so it never needs admin rights. Every change is backed up first and has an **Undo**. |
+| 🔍 **Finds what's broken** | Values that point to folders or files that don't exist are flagged, including each folder in `PATH`. |
+| ⚡ **No more "restart your terminal"** | One click pushes changes into terminals that are already open: PowerShell, Git Bash, bash, zsh and fish. |
+| 🧭 **A PATH editor you can trust** | Add, remove and reorder your folders in a list. The system part is read-only, and you review every change before it's saved. |
+| 🔐 **Secrets stay hidden** | API keys and passwords are masked on screen, can be copied without being shown, and can't be found by typing guesses into search. |
+| 🗂️ **Profiles and `.env` files** | Switch a whole set of variables per client or project in one click, and import or export `.env` files. |
+
+## Features
+
+### See everything, at a glance
+
+Every variable you've set, with a status that tells you whether it works and whether your terminals have it yet.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/variables-dark.png">
+  <img src="docs/images/variables-light.png" alt="The Variables page: a table of variables with their value, scope and status, and filters for each status" width="900">
+</picture>
+
+| Status | Meaning | What to do |
+|---|---|---|
+| 🟢 **Active & synced** | Saved, and the environment that's running already has it. | Nothing. |
+| 🟡 **Persistent only** | Saved, but terminals that were already open don't have it yet. New ones do. | Click **Sync to terminals**, or open a new terminal. |
+| 🔵 **Temporary** | Only pushed into open terminals and never saved. Handy for a quick test. | Edit it and choose **User** to keep it. |
+| 🔴 **Missing / stale** | Empty, or points to a folder or file that doesn't exist. | Fix the value, or delete it. |
+
+### Read long values, and spot the broken part
+
+`PATH` and other long values open right in the table, one folder per line, with folders that don't exist marked in red.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/long-values-dark.png">
+  <img src="docs/images/long-values-light.png" alt="The Path row opened under the table, listing each folder on its own line with one missing folder marked in red" width="900">
+</picture>
+
+### Edit PATH without fear
+
+Your folders are a list you can edit, reorder and check as you type. The system part of PATH is shown but locked. Before anything is saved you see exactly what changes, and a backup is taken first.
+
+<table>
+  <tr>
+    <td width="50%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/path-editor-dark.png">
+        <img src="docs/images/path-editor-light.png" alt="The PATH editor: a locked System PATH row, then your folders with up, down and remove buttons, and warnings under folders that don't exist">
+      </picture>
+    </td>
+    <td width="50%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/path-review-dark.png">
+        <img src="docs/images/path-review-light.png" alt="The review step: one folder added in green, one removed and struck through, and a Save PATH button">
+      </picture>
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Edit: missing folders, duplicates and what <code>%VAR%</code> points to are shown as you type.</sub></td>
+    <td align="center"><sub>Review: nothing is saved until you confirm.</sub></td>
+  </tr>
+</table>
+
+### Profiles, shells and backups
+
+<table>
+  <tr>
+    <td width="33%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/profiles-dark.png">
+        <img src="docs/images/profiles-light.png" alt="The Profiles page with three profiles and one active">
+      </picture>
+    </td>
+    <td width="33%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/shells-dark.png">
+        <img src="docs/images/shells-light.png" alt="The Shells page with a card per shell and an Install button for terminal sync">
+      </picture>
+    </td>
+    <td width="33%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/backups-dark.png">
+        <img src="docs/images/backups-light.png" alt="The Backups page, grouped by day, with a preview of what a restore would change">
+      </picture>
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Profiles</b>: switch a whole set of variables per client or project. Turning one off puts your previous values back.</sub></td>
+    <td align="center"><sub><b>Shells</b>: every shell VARden found, and one-click terminal sync for each.</sub></td>
+    <td align="center"><sub><b>Backups</b>: taken before every change. See what a restore would do before you confirm.</sub></td>
+  </tr>
+</table>
+
+### Everything else
+
+- **`.env` import and export.** Drop a `.env` file on the window to import it: you see what's new, what would be replaced, and what can't be read, before anything is written. Export any selection to a `.env` file, with your last five export folders one click away.
+- **Rename and bulk actions.** Rename a variable in place; select several to export or delete together.
+- **Changes from elsewhere show up on their own.** Changes from `setx`, the Windows dialog or an editor saving `.zshrc` appear without a refresh.
+- **Light and dark themes** that follow your system, plus keyboard shortcuts: <kbd>Ctrl</kbd>+<kbd>F</kbd> search, <kbd>Ctrl</kbd>+<kbd>N</kbd> new variable, <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>4</kbd> switch pages, <kbd>Del</kbd> delete selected, <kbd>F5</kbd> reload.
+- **Help where you need it.** A small **?** next to every term that might be new explains it in plain words.
+
+## How it works
+
+### Where your variables live
+
+VARden only ever writes to places that belong to your user account. Programs read from the same places they always have, so VARden doesn't need to be running for your variables to work.
+
+```mermaid
+flowchart LR
+    V["VARden"]
+
+    subgraph WIN["Windows"]
+        R[("Your account's variables<br/>HKEY_CURRENT_USER\Environment")]
+        S[("System variables<br/>HKEY_LOCAL_MACHINE")]
+    end
+
+    subgraph NIX["macOS / Linux"]
+        F["Your startup files<br/>.zshrc · .bashrc · config.fish<br/><i>inside a clearly marked block</i>"]
+    end
+
+    B[("Backups<br/>before every change")]
+
+    V -- "reads and writes" --> R
+    V -. "reads only" .-> S
+    V -- "reads and writes" --> F
+    V -- "saves a copy first" --> B
 ```
-crates/envcore/        Platform core: plain Rust, no Tauri, fully unit-tested
-  src/managed_block.rs   Finds, parses and rewrites the "# >>> VARDEN MANAGED BLOCK >>>" block
-  src/store/             Where user-level vars persist
-    windows_registry.rs    HKCU\Environment + WM_SETTINGCHANGE broadcast   (Windows)
-    shell_file.rs          Managed block inside .bashrc / .zshrc / config.fish / env.nu / $PROFILE
-  src/backup.rs          Timestamped backups before every write, restore, pruning
-  src/shells.rs          Shell + profile auto-detection
-  src/status.rs          Status pill logic (Active & Synced / Persistent Only / Process Only / Missing)
-  src/manager.rs         EnvManager (core API): what the Tauri commands call
-  src/sync.rs            Terminal sync: plan, per-shell hook and apply scripts (tested in real shells)
-  src/terminal.rs        Hook install/remove in profiles, Sync to terminals
-  src/dotenv.rs          .env parser and writer
-  src/transfer.rs        .env import/export
-  src/paths.rs           App data folder (%LOCALAPPDATA%\VARden)
-  src/watch.rs           Notices outside changes (registry notifications, file watcher)
-  src/profiles.rs        Profiles: apply as user or temporary, turn off restores previous values
-src-tauri/             Tauri app (binary `varden`): commands.rs wraps the core API
-src/                   React + Tailwind v4 frontend
-  lib/api.ts             Typed wrappers for every Tauri command
-  lib/useEnvironment.ts  Owns all data and mutations; the table is always replaced by what the backend returns
-  lib/filter.ts          Pure search, filter and sort logic (unit-tested with Vitest)
-  components/            Dashboard: status strip, variable table, shells, backups, toasts
+
+On macOS and Linux, VARden only edits lines between two markers in your startup file, and leaves everything else exactly as it was:
+
+```bash
+# >>> VARDEN MANAGED BLOCK >>>
+# Managed by VARden. Manual edits inside this block may be overwritten.
+export OPENAI_API_KEY='sk-...'
+export PATH="$HOME/.local/bin:$PATH"
+# <<< END VARDEN MANAGED BLOCK <<<
 ```
 
-## Prerequisites (Windows)
+### Updating terminals that are already open
 
-1. Rust via [rustup](https://rustup.rs), using the MSVC toolchain
-2. Visual Studio Build Tools with the "Desktop development with C++" workload
-3. Node.js 20 or newer
-4. WebView2 (preinstalled on Windows 10 and 11)
+Programs read environment variables once, when they start. That's why an open terminal never sees a change, and why tutorials say "restart your terminal". VARden solves this with a tiny hook you can install per shell from the **Shells** page:
 
-## Run
+```mermaid
+sequenceDiagram
+    autonumber
+    actor You
+    participant App as VARden
+    participant Disk as Sync folder
+    participant T as An open terminal
 
-```powershell
-npm install
-npm run tauri dev        # dev window with hot reload
-cargo test -p envcore    # core unit tests
-npm test                 # frontend unit tests
-npm run tauri build      # installer in target/release/bundle
+    You->>App: Click "Sync to terminals"
+    App->>Disk: Write the new values and bump a counter
+    Note over T: You press Enter. Before the next<br/>prompt, the hook reads the counter<br/>(one tiny file read).
+    T->>Disk: Counter changed?
+    Disk-->>T: Yes: here are the new values
+    T->>T: Update variables, merge PATH folders
+    Note over T: The very next command<br/>sees the new values
 ```
 
-## Phase 1 design decisions
+The hook is a few lines added to the shell's profile (backed up first) and can be removed with one click. Your activated virtualenv or conda environment survives a sync, because PATH is merged folder by folder rather than replaced.
 
-- **Values are written literally.** Shell files get single quotes (`export K='v'`), so `$`, backticks and `%` never expand by accident. A hand-written line inside the block that uses expansion (`export PATH="$HOME/bin:$PATH"`) is kept exactly as written. The app lists its raw text, and setting that key from the app replaces the line.
-- **Malformed blocks are never touched.** If a start or end marker is missing or duplicated, every write to that file is refused with an explanation, until you fix the file or restore a backup.
-- **Safe file writes.** The app writes a temp file and renames it into place. It follows symlinks, so dotfile managers keep working, and it keeps the BOM, CRLF line endings and file permissions as they were. If a write wouldn't change anything, it is skipped and no backup is made.
-- **Registry details.** An existing `REG_EXPAND_SZ` value (such as `Path`) keeps its type. New values that contain `%VAR%` become `REG_EXPAND_SZ`. Name matching ignores case, so the app never creates `path` next to an existing `Path`. The `WM_SETTINGCHANGE` broadcast runs on a background thread so a hung window can't freeze the UI.
-- **Backups.** Before every change, the app saves a copy of the file, or a JSON snapshot of all of `HKCU\Environment`, to `%LOCALAPPDATA%\VARden\backups\<timestamp>\` (on macOS `~/Library/Application Support/VARden/backups`, on Linux `~/.local/share/VARden/backups`). The first backup of each file (and of the registry) is its **original** state from before the app touched it, and it is never pruned. Only distinct states are kept: if the same content was already backed up, no new backup is written and the app says which existing backup already holds that state. Besides the original, the 50 newest backups per target are kept. Restoring a backup first backs up the current state, so a restore can itself be undone.
-- **Status semantics.** "Current" means the environment the app was launched with, plus any process-level variables set in the app. A variable you just saved therefore shows 🟡 *Persistent Only* until the app is restarted, because that is also true for terminals that are already open. For `PATH`, the status counts as synced when every user entry appears in the process PATH. (On Windows the process PATH is the system PATH plus the user PATH.)
-- **Windows uses only the registry.** PowerShell, cmd and Git Bash all inherit `HKCU\Environment`, so profile files are only detected, not written. On macOS and Linux the default target is your login shell's rc file, and `set_shell_targets` can add or swap files.
+### What happens when you change something
 
-## Phase 2: dashboard
+```mermaid
+flowchart LR
+    A["You change a variable"] --> B{"Valid?"}
+    B -- "No" --> X["Explained, nothing written"]
+    B -- "Yes" --> C["Back up the current state"]
+    C --> D["Write it"]
+    D --> E["Tell Windows and open apps<br/>(WM_SETTINGCHANGE)"]
+    E --> F["Toast with Undo"]
+```
 
-- **Status strip.** A proportional bar showing how your variables split across the four states. Click a state to filter the table; you can select several at once.
-- **Table.** Search, sorting by name, scope or status, a scope filter, inline editing, and a delete confirmation inside the row. The **N** key adds a variable and **/** jumps to search.
-- **Secrets.** Values that look sensitive are masked with a fixed-length mask, so their length isn't shown. Each has its own eye toggle, there's a global "Show secrets" switch, and values can be copied without being revealed. Search only matches values that are currently visible, so a masked secret can't be found by guessing.
-- **Temporary variables.** Never saved. **Sync to terminals** pushes them into open terminals that have terminal sync, where they win over a saved variable of the same name. Removing one drops it from those terminals at the next sync; new terminals and other programs never see them. Editing a temporary variable lets you save it to your user environment. Making a saved variable temporary isn't offered, because that would quietly delete saved data.
-- **Notices.** Every change is confirmed with a toast. If no new backup was needed, a toast says which existing backup already holds that state.
-- **Font.** The interface uses Atkinson Hyperlegible Next and Mono, bundled with the app, so 0/O and 1/l/I in tokens can't be confused.
+## Install
 
-## Phase 3: terminal sync, .env bridge, recovery
+> [!NOTE]
+> Ready-made installers for Windows, macOS and Linux arrive with the next release (see the [Roadmap](ROADMAP.md)). Until then, VARden is built from source, which takes a few minutes.
 
-- **Terminal sync.** On the Shells page, **Install** adds a short block to that shell's profile, marked `# >>> VARDEN SHELL HOOK >>>`, and backs the profile up first. The block sources a small hook script from `%LOCALAPPDATA%\VARden\shell`. **Sync to terminals** writes per-shell apply scripts to `VARden\sync` and then bumps a generation number. Before drawing its next prompt, each hooked terminal reads that number (one small file read) and applies the changes if it has moved. This works for PowerShell 7, Windows PowerShell, Git Bash, bash, zsh and fish. Command Prompt has no prompt hook and Nushell isn't supported yet, so open a new window for those.
-  - Apply scripts always describe the full desired state, so a terminal that missed several syncs still ends up correct, and variables deleted since an earlier sync are removed. On Windows, deleting a user variable that overrides a machine variable brings back the machine value.
-  - PATH is merged entry by entry instead of overwritten, so an activated virtualenv or conda environment survives a sync.
-  - A new terminal starts with your saved variables already, so its hook only applies syncs made after it opened.
-  - The spec suggested `eval "$(envmanager hook)"` (the project's working title). The profile sources a static script instead, so nothing has to be on PATH and starting a shell never launches the app.
-- **.env import.** Use **Import .env**, or drop a file anywhere on the window. You see every variable first, marked *New*, *Replaces current value* or *Unchanged* (unchanged ones start unticked), plus any lines that couldn't be read and why. You choose the user environment or this session. The import is written with one backup and can be undone in one step.
-- **.env export.** Pick variables, preselected from what the table is currently showing, then choose where to save. You're warned when secrets would be written as plain text. Windows `%VAR%` values are written expanded.
-- **Recovery.** Before a restore, the Backups page lists exactly which variables would come back, change or be removed. Every change's toast has **Undo**. An error about a damaged managed block offers a shortcut to Backups.
+1. Install [Rust](https://rustup.rs) and [Node.js 20+](https://nodejs.org). On Windows you also need the [Visual Studio C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) ("Desktop development with C++"). On Linux you need the [Tauri system packages](https://tauri.app/start/prerequisites/#linux).
+2. Build and run:
 
-## Stage 1: foundation
+   ```bash
+   git clone https://github.com/RamezCh/VARden.git
+   cd VARden
+   npm install
+   npm run tauri dev      # run it
+   npm run tauri build    # or build an installer into target/release/bundle
+   ```
 
-- **One instance.** Launching the app while it's already running brings the open window to the front instead of starting a second copy, so two windows can never write at the same time.
-- **Automatic refresh.** Changes made outside the app (`setx`, the Windows dialog, an editor saving `.zshrc`) show up on their own. On Windows the app subscribes to change notifications for `HKCU\Environment`. On every platform it watches the folders that hold the startup files, which also catches editors that save by replacing the file. Bursts of events become one refresh, and the echo of the app's own writes is ignored. The window also refreshes when it regains focus, and a notice appears when something changed.
-- **Log file.** Diagnostics are written to `%LOCALAPPDATA%\VARden\logs` (macOS `~/Library/Application Support/VARden/logs`, Linux `~/.local/share/VARden/logs`): at most 5 files of 1 MB each. Logs contain variable names and actions, never values. **Open log folder** in the sidebar opens it.
-- **CI.** Every push runs formatting, clippy, Rust and frontend tests and a full app build on Windows, macOS and Linux, including the terminal hook in real bash, zsh, fish and PowerShell.
+## Quick start
 
-See [ROADMAP.md](ROADMAP.md) for what comes next.
+1. **Open VARden.** The **Variables** page lists everything you've set for your account. Anything 🔴 needs a look.
+2. **Add a variable** with **New variable** (<kbd>Ctrl</kbd>+<kbd>N</kbd>). Choose **User** to keep it, or **Temporary** to try it in open terminals only.
+3. **Set up terminal sync once.** Go to **Shells** and click **Install** next to the shells you use. Open a new terminal so it picks up the hook.
+4. **Sync.** From now on, after a change, click **Sync to terminals** and your open terminals have it at their next prompt.
+5. **Made a mistake?** Click **Undo** on the notice, or restore any earlier state from **Backups**.
 
-## Stage 2: validation
+## VARden compared
 
-- **Broken paths are 🔴.** Path lists (PATH, PYTHONPATH, CLASSPATH, PSModulePath and similar, plus any `*_PATH` variable holding a list) are checked entry by entry, and a value that is a single absolute path (`JAVA_HOME`, `GOROOT`) is checked as a whole, after expanding `%VAR%` or `~`. Missing entries are listed under the value, and the status becomes *Missing / stale*. The row keeps tracking whether open terminals are up to date. URLs, relative paths and shell expressions are never checked, and neither are network paths (`\\server\share`), because an unreachable share can stall a check for seconds.
-- **Expanded values.** Values with `%VAR%` show what programs actually get, for example *Expands to C:\Users\you\go*.
-- **More help.** The help texts explain what happens to temporary variables when VARden closes, and what *Missing / stale* means.
+How VARden compares with the tools you'd otherwise use:
 
-## Stage 3: profiles and startup files
+|  | **VARden** | Windows "Environment Variables" dialog | `setx` | Editing `.bashrc` / `.zshrc` by hand |
+|---|:---:|:---:|:---:|:---:|
+| See every variable at once | ✅ | ✅ | ❌ | ❌ |
+| Backup and undo for every change | ✅ | ❌ | ❌ | ❌ |
+| Flags values that point to missing folders | ✅ | ❌ | ❌ | ❌ |
+| Updates terminals that are already open | ✅ | ❌ | ❌ | `source` in each terminal |
+| PATH edited as a list, with a review step | ✅ | List, no review | ❌ ([cuts values at 1,024 characters](https://learn.microsoft.com/en-us/answers/questions/900933/setx-command-warning-the-data-being-saved-is-trunc)) | ❌ |
+| Secrets masked on screen | ✅ | ❌ | ❌ | ❌ |
+| Profiles per project or client | ✅ | ❌ | ❌ | ❌ |
+| `.env` import and export | ✅ | ❌ | ❌ | ❌ |
+| Works on Windows, macOS and Linux | ✅ | Windows | Windows | macOS / Linux |
+| Needs admin rights | Never | For system variables | For `/M` | No |
 
-- **Profiles** are named sets of variables, for example one per client or project. **Apply** saves them as user variables; **Apply temporarily** keeps them for open terminals only (pushed by *Sync to terminals*, never saved). One profile is active at a time and switching turns the previous one off. Applying remembers each variable's previous value and **Turn off** puts it back, except for values you changed by hand in between. An entry with an empty value marks a required variable: it isn't written, and while the profile is active it shows as *Missing* until it has a value. Editing an active profile offers **Re-apply**. Profiles can be filled by hand, from current variables, or from a `.env` file. They are stored in `profiles.json` in the app folder; like the registry and startup files, values are plain text.
-- **Startup files.** The shell files VARden writes to are called *startup files*, so "profile" only means variable sets. On macOS and Linux, *Shells → Where variables are saved* lets you add or remove startup files (for example one in a dotfiles folder). The choice is saved in `settings.json` and survives restarts, and newly chosen files are watched for outside changes right away.
-- **Safer migration.** Moving backups from an older folder no longer drops a backup whose id (a millisecond timestamp) collides with an existing one; it gets a fresh id instead.
+## FAQ
 
-## Stage 4: editing tools
+<details>
+<summary><b>Is it safe? Could VARden break my computer?</b></summary>
 
-- **Safe PATH editor** (*Edit PATH*, or the edit button on the PATH row). Only your own folders can be added, removed, edited or reordered. The system part of PATH is shown read-only and is never written: on Windows it is the machine `Path` in HKLM, which always comes first; on macOS and Linux it is the PATH the shell already has, and your folders are written as one line in VARden's block that adds them around it (`export PATH="$HOME/bin:$PATH"`, or `set -gx PATH … $PATH` in fish), so PATH is never replaced. Each folder is checked as you type: missing folders, folders already earlier on PATH, and what `%VAR%`, `$HOME` or `~` expand to. Nothing is saved until you have reviewed the changes (added, removed, order changed). A backup is taken first and the toast offers Undo. A PATH line the editor can't read safely (one that runs a command, for example) is reported, not silently rewritten. Nushell and PowerShell startup files aren't supported by the editor yet.
-- **Rename.** Change the name in the edit row; the value moves to the new name with one backup. Renaming onto an existing name, or a case-only rename on Windows, is refused. Shell expressions in startup files are renamed by hand.
-- **Bulk select.** Checkboxes on every row, plus one that selects everything shown. Selected variables can be exported or deleted together, with one backup per store.
-- **Recent export folders.** The export dialog lists the last five folders you exported to; clicking one opens the save dialog there. Stored in `settings.json`; folders that no longer exist are skipped.
+VARden only writes variables that belong to your user account. It never touches system-wide variables, so it can't affect other accounts or Windows itself, and it never asks for admin rights. Before every change it saves a backup, and every change has **Undo**. The very first backup of each place it writes to (your "original") is kept forever, so you can always go back to how things were before you installed VARden.
+</details>
 
-## Interface polish
+<details>
+<summary><b>I changed a variable but my terminal still has the old value. Why?</b></summary>
 
-- **Light and dark themes.** VARden follows the system theme; the sidebar's Theme switch can pin it to light or dark, and the native title bar follows the choice.
-- **Desktop behaviour.** The window reopens at its last size and position. Shortcuts: Ctrl+1–4 switch pages, Ctrl+F or `/` searches, Ctrl+N or `N` adds a variable, F5 re-reads everything, and in the table Ctrl+A selects what's shown, Del deletes the selection and Esc clears it. Double-click a row to edit it. Interface text isn't selectable and the browser's context menu, reload and print shortcuts are off, but values, paths and inputs can still be selected and copied.
-- **Readable long values.** Long values, path lists and `%VAR%` values open under their row: lists one entry per line with missing folders marked, other values wrapped in full, each with a Copy button.
-- **Calmer layout.** One header style on every page, the same width everywhere, grouped actions (Edit PATH, a `.env` menu, Sync, New variable), compact status filters instead of the coloured bar, row actions that appear on hover, sidebar icons, and shell cards that show a file's name with its folder underneath.
-- **Fix:** a value that is a folder followed by a separator (JetBrains installers write `IntelliJ IDEA` = `C:\...\bin;` and add `%IntelliJ IDEA%` to PATH) is no longer flagged as missing.
+Programs read environment variables once, when they start. That's how every operating system works, not a VARden quirk. You have two options:
 
-## Renamed to VARden
+- Open a new terminal, which always gets the new values.
+- Install **terminal sync** for your shell on the **Shells** page. After that, **Sync to terminals** updates open terminals before their next prompt.
 
-Earlier builds were called *Environment Manager*. On first start, VARden moves their data (backups including originals, sync state, hook scripts) from `%LOCALAPPDATA%\EnvManager` into `%LOCALAPPDATA%\VARden` and removes the old folder. Blocks in startup files written with the old `ENVMANAGER` markers are still recognised and are rewritten with `VARDEN` markers on the next change. Installed terminal-sync hooks are updated to the new location right away, with a backup first.
+Other programs (your IDE, for example) need to be restarted to see changes.
+</details>
 
-## Backups page and help
+<details>
+<summary><b>What's the difference between User and Temporary?</b></summary>
 
-- **Grouped by day.** Today, Yesterday, then dated groups. Each row shows the time and what the backup was taken before.
-- **Deleting.** You can delete one backup, a whole day, or everything with **Clear backups**. Each asks for confirmation first, and deleting can't be undone. The **original** of each file (or of the registry) is never deleted, in the UI or in the backend, so you can always return to the state from before the app was used.
-- **Help.** A small **?** next to terms people may not know (scope, statuses, terminal sync, the registry location, originals, `.env` files) explains them on hover, on keyboard focus, or on click.
+**User** variables are saved for your account: every new terminal and program gets them, also after a restart. **Temporary** variables are never saved. They're pushed into open terminals when you sync, and they're gone when those terminals close. They're useful to try something out, or for values you don't want written to disk.
+</details>
 
-## Tauri commands
+<details>
+<summary><b>Why can't I edit system variables?</b></summary>
 
-`get_platform_info`, `list_variables`, `set_variable`, `delete_variable`, `detect_shells`, `get_shell_targets`, `set_shell_targets`, `list_backups`, `preview_restore`, `restore_backup`, `delete_backups`, `get_terminal_sync`, `install_terminal_hook`, `remove_terminal_hook`, `sync_terminals`, `read_env_file`, `import_variables`, `export_env_file`, `open_logs_folder`, `list_profiles`, `save_profile`, `delete_profile`, `apply_profile`, `deactivate_profile`, `delete_variables`, `rename_variable`, `get_path_info`, `check_path_entries`, `set_user_path`, `recent_export_folders`. Each mutation returns the refreshed variable list plus the backups it created.
+On purpose. System variables affect every account on the computer and need admin rights to change, so a mistake there is much harder to undo. VARden shows the system part of `PATH` read-only so you can see the whole picture, but it never writes it. If you really need to change a system variable, use the Windows dialog as an administrator.
+</details>
+
+<details>
+<summary><b>Are my API keys stored securely?</b></summary>
+
+VARden stores values exactly where your operating system expects them: the Windows registry, or your shell's startup file. That's the same place they'd be if you set them any other way, and it's what programs read. VARden doesn't add encryption, because programs couldn't read encrypted values. What it does add:
+
+- Secrets are masked on screen and can be copied without being shown.
+- Masked values can't be found by searching.
+- The log file records variable *names*, never values.
+- Nothing is ever sent over the network.
+</details>
+
+<details>
+<summary><b>Why is a variable marked 🔴 "Missing / stale" when it looks fine?</b></summary>
+
+Either its value is empty, or it points to a folder or file that doesn't exist on this computer. Open the row (the ▸ arrow) to see exactly which part is missing. Common causes are an uninstalled SDK, a version number that changed after an update (`jdk-17` vs `jdk-17.0.2`), or a typo. URLs, relative paths and network shares are never checked, so they're never flagged.
+</details>
+
+<details>
+<summary><b>Does it work with Command Prompt, WSL, IDEs and Docker?</b></summary>
+
+- **Command Prompt** gets your variables in every new window, but has no hook for updating windows that are already open.
+- **IDEs and other apps** get your variables when they start. Restart them after a change.
+- **WSL** keeps its own Linux environment. Windows variables only reach it when you list them in `WSLENV`.
+- **Docker containers** don't inherit your variables unless you pass them with `-e` or `--env-file`. VARden's `.env` export is handy for that.
+</details>
+
+<details>
+<summary><b>I edited my <code>.zshrc</code> by hand. Will VARden overwrite it?</b></summary>
+
+No. VARden only changes lines between its own markers and leaves everything else in the file untouched, including line endings and file permissions. If you edit inside the block by hand, VARden keeps lines it can't fully understand exactly as written. If the markers themselves get damaged, VARden refuses to write to that file until it's fixed or restored from a backup.
+</details>
+
+<details>
+<summary><b>What happens if I uninstall VARden?</b></summary>
+
+Your variables stay. They live in your account and your startup files, not inside VARden. The uninstaller planned for the next release will also remove the terminal-sync hooks from your shell profiles. Until then, remove them on the **Shells** page before uninstalling.
+</details>
+
+<details>
+<summary><b>Does VARden collect any data?</b></summary>
+
+No. There's no telemetry, no account and no network access. Diagnostic logs stay on your computer (**Open log folder** in the sidebar) and contain variable names and actions, never values.
+</details>
+
+## Roadmap
+
+VARden is built in stages. See [ROADMAP.md](ROADMAP.md) for the full list.
+
+- [x] User and temporary variables, backups and undo, status checks
+- [x] Terminal sync, `.env` import and export, restore preview
+- [x] Broken-path detection, profiles, custom startup files
+- [x] Safe PATH editor, rename, bulk actions, light and dark themes
+- [ ] **Next:** installers, an uninstaller that cleans up hooks, auto-updates, a tray icon
+- [ ] Launch: license and contributing guide
+
+## Developing
+
+VARden is a [Tauri 2](https://tauri.app) app: the core is plain Rust (`crates/envcore`, fully unit-tested, no UI), and the interface is React with Tailwind CSS. Every push is checked on Windows, macOS and Linux, including the terminal hooks in real bash, zsh, fish and PowerShell.
+
+See **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** for the code layout, build steps, design decisions and the full command list.

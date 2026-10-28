@@ -33,5 +33,5 @@ Phases 1–3 of the original spec (backend core, dashboard, terminal sync, `.env
 - [ ] Tray icon with Sync to terminals, and an optional "start with Windows".
 
 ## Stage 6: Launch
-- [ ] README with GIF and screenshots, comparison table, FAQ.
+- [x] README with GIF and screenshots, comparison table, FAQ.
 - [ ] License, contributing guide, release workflow that publishes installers.

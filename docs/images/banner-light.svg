@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-label="VARden: environment variables without the fear">
+  <rect width="1200" height="300" rx="20" fill="#f4f5f7"/>
+  <g transform="translate(96 78)">
+    <rect x="0" y="0" width="144" height="144" rx="40" fill="#ffffff" stroke="#dcdfe5" stroke-width="3"/>
+    <circle cx="42" cy="96" r="13" fill="#18855a"/>
+    <circle cx="72" cy="96" r="13" fill="#9a6700"/>
+    <circle cx="102" cy="96" r="13" fill="#2563c9"/>
+  </g>
+  <text x="284" y="150" font-family="Segoe UI, -apple-system, Helvetica, Arial, sans-serif" font-size="78" font-weight="700" fill="#1a1f29" letter-spacing="-1.5">VARden</text>
+  <text x="288" y="198" font-family="Segoe UI, -apple-system, Helvetica, Arial, sans-serif" font-size="27" fill="#586273">Environment variables, without the fear.</text>
+  <g font-family="Consolas, Menlo, monospace" font-size="17" fill="#586273">
+    <g transform="translate(860 82)">
+      <rect width="244" height="38" rx="8" fill="#ffffff" stroke="#dcdfe5"/>
+      <circle cx="20" cy="19" r="5" fill="#18855a"/><text x="36" y="25" fill="#1a1f29">EDITOR</text>
+    </g>
+    <g transform="translate(860 131)">
+      <rect width="244" height="38" rx="8" fill="#ffffff" stroke="#dcdfe5"/>
+      <circle cx="20" cy="19" r="5" fill="#9a6700"/><text x="36" y="25" fill="#1a1f29">DATABASE_URL</text>
+    </g>
+    <g transform="translate(860 180)">
+      <rect width="244" height="38" rx="8" fill="#ffffff" stroke="#dcdfe5"/>
+      <circle cx="20" cy="19" r="5" fill="#c73a3a"/><text x="36" y="25" fill="#1a1f29">JAVA_HOME</text>
+    </g>
+  </g>
+</svg>
