@@ -158,9 +158,12 @@ Your folders are a list you can edit, reorder and check as you type. The system 
 ### Everything else
 
 - **`.env` import and export.** Drop a `.env` file on the window to import it: you see what's new, what would be replaced, and what can't be read, before anything is written. Export any selection to a `.env` file, with your last five export folders one click away.
+- **Secrets stay secret.** Keys and passwords are masked on screen. A copied secret is kept out of clipboard history and cleared after 30 seconds, and secrets saved in profiles live in your system's password store (Windows Credential Manager, the macOS keychain, or your Linux keyring).
 - **Rename and bulk actions.** Rename a variable in place; select several to export or delete together.
 - **Changes from elsewhere show up on their own.** Changes from `setx`, the Windows dialog or an editor saving `.zshrc` appear without a refresh.
 - **Lives in the tray.** Sync open terminals from the tray icon without opening the window, and optionally start VARden with your computer. Closing the window keeps it in the tray unless you turn that off in **Settings**.
+- **Updates itself.** New versions install with one click from **Settings**. Every update is signed, and VARden refuses one whose signature doesn't match.
+- **Problem reports that protect you.** **Settings > Report a problem** shows a cleaned copy of the log (variable names, your user name and anything key-like replaced), lets you copy it only after you've checked it, and opens a GitHub issue with your version and system filled in.
 - **Light and dark themes** that follow your system, plus keyboard shortcuts: <kbd>Ctrl</kbd>+<kbd>F</kbd> search, <kbd>Ctrl</kbd>+<kbd>N</kbd> new variable, <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>5</kbd> switch pages, <kbd>Del</kbd> delete selected, <kbd>F5</kbd> reload.
 - **Help where you need it.** A small **?** next to every term that might be new explains it in plain words.
 
@@ -245,6 +248,8 @@ Download the file for your system from the [latest release](https://github.com/R
 | Windows 10 and 11 | `VARden_x.y.z_x64-setup.exe` | Installs for your account only, so it never asks for administrator rights. Asks whether to add VARden to the Start menu and to the desktop. |
 | macOS 11 or later | `VARden_x.y.z_universal.dmg` | Works on Apple Silicon and Intel Macs. |
 | Linux | `.AppImage`, `.deb` or `.rpm` | The AppImage updates itself; for `.deb` and `.rpm`, install the new package. |
+
+There's nothing else to install first: no Git, Rust, Node.js or command line. On Windows the installer fetches Microsoft's WebView2 component if your system doesn't have it yet (Windows 10 and 11 normally do). The `.deb` and `.rpm` packages pull in their libraries through your package manager, and the AppImage brings everything with it. Building from source, below, is only for people who want to change the code.
 
 VARden checks for new versions when it starts (you can turn this off in **Settings**). Updates are signed, and VARden refuses any update whose signature doesn't match.
 

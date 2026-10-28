@@ -103,12 +103,24 @@
           <dd>A backup is taken before every change. Undo is one click, and the original state from before VARden is kept forever.</dd>
         </div>
         <div>
-          <dt><span class="dot plain"></span>Keeps secrets off screen</dt>
-          <dd>API keys and passwords are masked, can be copied without being shown, and can't be found by typing guesses into search.</dd>
+          <dt><span class="dot plain"></span>Keeps secrets secret</dt>
+          <dd>API keys and passwords are masked on screen. A copied secret stays out of clipboard history and is cleared after 30 seconds, and secrets saved in profiles go to your system's password store.</dd>
         </div>
         <div>
           <dt><span class="dot plain"></span>Profiles and .env files</dt>
           <dd>Switch a whole set of variables per client or project at once, and import or export <code>.env</code> files.</dd>
+        </div>
+        <div>
+          <dt><span class="dot plain"></span>Rename and edit in bulk</dt>
+          <dd>Rename a variable in place, delete or export several at once, and see changes made by other tools appear without a refresh.</dd>
+        </div>
+        <div>
+          <dt><span class="dot plain"></span>Waits in the tray</dt>
+          <dd>Sync open terminals from the tray icon without opening the window, and start VARden with your computer if you like.</dd>
+        </div>
+        <div>
+          <dt><span class="dot plain"></span>Keeps itself up to date</dt>
+          <dd>New versions install with one click. Every update is signed, and VARden refuses one whose signature doesn't match.</dd>
         </div>
       </dl>
     </section>
@@ -211,7 +223,15 @@
         </details>
         <details>
           <summary>Are my API keys stored securely?</summary>
-          <p>VARden stores values exactly where your system expects them (the registry, or your shell's startup file), because that's what programs read. It masks secrets on screen, never writes values to its log, and keeps its backups in a folder only your account can open.</p>
+          <p>VARden stores values exactly where your system expects them (the registry, or your shell's startup file), because that's what programs read. It masks secrets on screen, clears copied secrets from the clipboard after 30 seconds, and never writes values to its log. Secrets in profiles are kept in Windows Credential Manager, the macOS keychain or your Linux keyring, and backups sit in a folder only your account can open.</p>
+        </details>
+        <details>
+          <summary>Do I need to install anything else first?</summary>
+          <p>No. Download the installer for your system and run it; you don't need Git, Rust, Node.js or a terminal. On Windows, VARden uses the Edge WebView2 component that comes with Windows 10 and 11, and the installer downloads it if it's missing. On Linux, the <code>.deb</code> and <code>.rpm</code> packages pull in what they need through your package manager, and the AppImage brings everything with it.</p>
+        </details>
+        <details>
+          <summary>Something went wrong. How do I report it?</summary>
+          <p>Open Settings in VARden and choose Report a problem. It shows a cleaned copy of its log, with variable names, your user name and anything that looks like a key replaced, and only lets you copy it after you've checked it. Then it opens a GitHub issue with your version and system filled in.</p>
         </details>
         <details>
           <summary>Why can't I edit system variables?</summary>
@@ -256,6 +276,7 @@
       <p class="aside" id="no-release" hidden>
         The first release is being prepared. Until it's out, you can <a href="https://github.com/RamezCh/VARden#build-from-source">build VARden from source</a> in a few minutes.
       </p>
+      <p class="aside">Just download and run: nothing else to install, no command line needed.</p>
       <p class="aside">Installers are built from the public source by GitHub Actions. See the <a href="code-signing.html">code signing policy</a>.</p>
     </section>
   </main>
