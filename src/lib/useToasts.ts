@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export type ToastKind = "success" | "info" | "error";
+export interface ToastAction {
+  label: string;
+  run: () => void;
+}
 export interface Toast {
   id: number;
   kind: ToastKind;
   text: string;
+  action?: ToastAction;
 }
 
 /** Success/info toasts dismiss themselves; errors stay until dismissed. */
@@ -21,11 +26,13 @@ export function useToasts() {
   }, []);
 
   const push = useCallback(
-    (kind: ToastKind, text: string) => {
+    (kind: ToastKind, text: string, action?: ToastAction) => {
       const id = nextId.current++;
-      setToasts((ts) => [...ts.slice(-3), { id, kind, text }]);
+      setToasts((ts) => [...ts.slice(-3), { id, kind, text, action }]);
       if (kind !== "error") {
-        timers.current.set(id, window.setTimeout(() => dismiss(id), kind === "info" ? 9000 : 4500));
+        // Toasts with an action (Undo) stay long enough to use it.
+        const ms = action ? 10000 : kind === "info" ? 9000 : 4500;
+        timers.current.set(id, window.setTimeout(() => dismiss(id), ms));
       }
     },
     [dismiss],

@@ -14,6 +14,11 @@ crates/envcore/        Platform core: plain Rust, no Tauri, fully unit-tested
   src/shells.rs          Shell + profile auto-detection
   src/status.rs          Status pill logic (Active & Synced / Persistent Only / Process Only / Missing)
   src/manager.rs         EnvManager: the API the Tauri commands call
+  src/sync.rs            Terminal sync: plan, per-shell hook and apply scripts (tested in real shells)
+  src/terminal.rs        Hook install/remove in profiles, Sync to terminals
+  src/dotenv.rs          .env parser and writer
+  src/transfer.rs        .env import/export
+  src/paths.rs           App data folder (%LOCALAPPDATA%\EnvManager)
 src-tauri/             Tauri app: commands.rs wraps EnvManager
 src/                   React + Tailwind v4 frontend
   lib/api.ts             Typed wrappers for every Tauri command
@@ -45,7 +50,7 @@ npm run tauri build      # installer in target/release/bundle
 - **Malformed blocks are never touched.** If a start or end marker is missing or duplicated, every write to that file is refused with an explanation, until you fix the file or restore a backup.
 - **Safe file writes.** The app writes a temp file and renames it into place. It follows symlinks, so dotfile managers keep working, and it keeps the BOM, CRLF line endings and file permissions as they were. If a write wouldn't change anything, it is skipped and no backup is made.
 - **Registry details.** An existing `REG_EXPAND_SZ` value (such as `Path`) keeps its type. New values that contain `%VAR%` become `REG_EXPAND_SZ`. Name matching ignores case, so the app never creates `path` next to an existing `Path`. The `WM_SETTINGCHANGE` broadcast runs on a background thread so a hung window can't freeze the UI.
-- **Backups.** Before every change, the app saves a copy of the file, or a JSON snapshot of all of `HKCU\Environment`, to `%LOCALAPPDATA%\\EnvManager\\backups\\<timestamp>\\` (on macOS `~/Library/Application Support/EnvManager/backups`, on Linux `~/.local/share/EnvManager/backups`). The first backup of each file (and of the registry) is its **original** state from before the app touched it, and it is never pruned. Only distinct states are kept: if the same content was already backed up, no new backup is written and the app says which existing backup already holds that state. Besides the original, the 50 newest backups per target are kept. Restoring a backup first backs up the current state, so a restore can itself be undone.
+- **Backups.** Before every change, the app saves a copy of the file, or a JSON snapshot of all of `HKCU\Environment`, to `%LOCALAPPDATA%\EnvManager\backups\<timestamp>\` (on macOS `~/Library/Application Support/EnvManager/backups`, on Linux `~/.local/share/EnvManager/backups`). The first backup of each file (and of the registry) is its **original** state from before the app touched it, and it is never pruned. Only distinct states are kept: if the same content was already backed up, no new backup is written and the app says which existing backup already holds that state. Besides the original, the 50 newest backups per target are kept. Restoring a backup first backs up the current state, so a restore can itself be undone.
 - **Status semantics.** "Current" means the environment the app was launched with, plus any process-level variables set in the app. A variable you just saved therefore shows 🟡 *Persistent Only* until the app is restarted, because that is also true for terminals that are already open. For `PATH`, the status counts as synced when every user entry appears in the process PATH. (On Windows the process PATH is the system PATH plus the user PATH.)
 - **Windows uses only the registry.** PowerShell, cmd and Git Bash all inherit `HKCU\Environment`, so profile files are only detected, not written. On macOS and Linux the default target is your login shell's rc file, and `set_shell_targets` can add or swap files.
 
@@ -58,6 +63,17 @@ npm run tauri build      # installer in target/release/bundle
 - **Notices.** Every change is confirmed with a toast. If no new backup was needed, a toast says which existing backup already holds that state.
 - **Font.** The interface uses Atkinson Hyperlegible Next and Mono, bundled with the app, so 0/O and 1/l/I in tokens can't be confused.
 
+## Phase 3: terminal sync, .env bridge, recovery
+
+- **Terminal sync.** On the Shells page, **Install** adds a short block to that shell's profile, marked `# >>> ENVMANAGER SHELL HOOK >>>`, and backs the profile up first. The block sources a small hook script from `%LOCALAPPDATA%\EnvManager\shell`. **Sync to terminals** writes per-shell apply scripts to `EnvManager\sync` and then bumps a generation number. Before drawing its next prompt, each hooked terminal reads that number (one small file read) and applies the changes if it has moved. This works for PowerShell 7, Windows PowerShell, Git Bash, bash, zsh and fish. Command Prompt has no prompt hook and Nushell isn't supported yet, so open a new window for those.
+  - Apply scripts always describe the full desired state, so a terminal that missed several syncs still ends up correct, and variables deleted since an earlier sync are removed. On Windows, deleting a user variable that overrides a machine variable brings back the machine value.
+  - PATH is merged entry by entry instead of overwritten, so an activated virtualenv or conda environment survives a sync.
+  - A new terminal starts with your saved variables already, so its hook only applies syncs made after it opened.
+  - The spec suggested `eval "$(envmanager hook)"`. The profile sources a static script instead, so nothing has to be on PATH and starting a shell never launches the app.
+- **.env import.** Use **Import .env**, or drop a file anywhere on the window. You see every variable first, marked *New*, *Replaces current value* or *Unchanged* (unchanged ones start unticked), plus any lines that couldn't be read and why. You choose the user environment or this session. The import is written with one backup and can be undone in one step.
+- **.env export.** Pick variables, preselected from what the table is currently showing, then choose where to save. You're warned when secrets would be written as plain text. Windows `%VAR%` values are written expanded.
+- **Recovery.** Before a restore, the Backups page lists exactly which variables would come back, change or be removed. Every change's toast has **Undo**. An error about a damaged managed block offers a shortcut to Backups.
+
 ## Tauri commands
 
-`get_platform_info`, `list_variables`, `set_variable`, `delete_variable`, `detect_shells`, `get_shell_targets`, `set_shell_targets`, `list_backups`, `restore_backup`. Each mutation returns the refreshed variable list plus the backups it created.
+`get_platform_info`, `list_variables`, `set_variable`, `delete_variable`, `detect_shells`, `get_shell_targets`, `set_shell_targets`, `list_backups`, `preview_restore`, `restore_backup`, `get_terminal_sync`, `install_terminal_hook`, `remove_terminal_hook`, `sync_terminals`, `read_env_file`, `import_variables`, `export_env_file`. Each mutation returns the refreshed variable list plus the backups it created.

@@ -1,23 +1,41 @@
 // Single source of truth for the dashboard. Every mutation goes through a
 // Tauri command, and the table is replaced with the list the backend returns,
 // so the UI never drifts from what is actually stored.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
+  syncApi,
   type BackupEntry,
   type BackupOutcome,
   type DetectedShell,
+  type EnvEntry,
   type EnvVar,
+  type ExportItem,
   type MutationResult,
   type PlatformInfo,
   type Scope,
+  type ShellKind,
+  type TerminalSyncInfo,
 } from "./api";
-import type { ToastKind } from "./useToasts";
+import { fileName } from "./files";
+import type { ToastAction, ToastKind } from "./useToasts";
 
-type Notify = (kind: ToastKind, text: string) => void;
+type Notify = (kind: ToastKind, text: string, action?: ToastAction) => void;
 
 export function formatWhen(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+/** "9:50 AM" for today, otherwise "Oct 27". */
+export function formatShort(iso: string): string {
+  const d = new Date(iso);
+  return d.toDateString() === new Date().toDateString()
+    ? d.toLocaleTimeString(undefined, { timeStyle: "short" })
+    : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+export function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
 /** Tell the user when no new backup was written because one already holds this state. */
@@ -28,27 +46,40 @@ function reusedNotice(backups: BackupOutcome[]): string | null {
   return `No new backup needed. This exact state is already saved in ${which} from ${formatWhen(reused.createdAt)}.`;
 }
 
-export function useEnvironment(notify: Notify) {
+export function useEnvironment(notify: Notify, openBackups: () => void) {
   const [platform, setPlatform] = useState<PlatformInfo | null>(null);
   const [vars, setVars] = useState<EnvVar[]>([]);
   const [shells, setShells] = useState<DetectedShell[]>([]);
   const [backups, setBackups] = useState<BackupEntry[]>([]);
+  const [sync, setSync] = useState<TerminalSyncInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+
+  const fail = useCallback(
+    (e: unknown) => {
+      const text = String(e);
+      // A damaged managed block can only be fixed by hand or from a backup.
+      const action = /malformed|damaged/i.test(text) ? { label: "Open backups", run: openBackups } : undefined;
+      notify("error", text, action);
+    },
+    [notify, openBackups],
+  );
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, v, s, b] = await Promise.all([
+      const [p, v, s, b, t] = await Promise.all([
         api.platformInfo(),
         api.listVariables(),
         api.detectShells(),
         api.listBackups(),
+        syncApi.terminalSync(),
       ]);
       setPlatform(p);
       setVars(v);
       setShells(s);
       setBackups(b);
+      setSync(t);
     } catch (e) {
       notify("error", `Couldn't read your environment: ${String(e)}`);
     } finally {
@@ -60,27 +91,46 @@ export function useEnvironment(notify: Notify) {
     void refresh();
   }, [refresh]);
 
+  // `undo` restores backups, which is itself a mutation; a ref breaks the cycle.
+  const undoRef = useRef<(taken: BackupOutcome[]) => void>(() => {});
+
   /** Runs a mutation; returns true on success so forms know whether to close. */
   const mutate = useCallback(
-    async (call: () => Promise<MutationResult>, success: string): Promise<boolean> => {
+    async (call: () => Promise<MutationResult>, success: string, undoable = true): Promise<boolean> => {
       setBusy(true);
       try {
         const result = await call();
         setVars(result.variables);
         setBackups(await api.listBackups());
-        notify("success", success);
-        const notice = reusedNotice(result.backups);
+        const taken = result.backups;
+        notify(
+          "success",
+          success,
+          undoable && taken.length > 0 ? { label: "Undo", run: () => undoRef.current(taken) } : undefined,
+        );
+        const notice = reusedNotice(taken);
         if (notice) notify("info", notice);
         return true;
       } catch (e) {
-        notify("error", String(e));
+        fail(e);
         return false;
       } finally {
         setBusy(false);
       }
     },
-    [notify],
+    [notify, fail],
   );
+
+  undoRef.current = (taken) =>
+    void mutate(
+      async () => {
+        let last: MutationResult | null = null;
+        for (const b of taken) last = await api.restoreBackup(b.id);
+        return last ?? { variables: vars, backups: [] };
+      },
+      "Undone. The previous state is restored.",
+      false,
+    );
 
   const setVariable = useCallback(
     (key: string, value: string, scope: Scope, existed: boolean) =>
@@ -108,5 +158,103 @@ export function useEnvironment(notify: Notify) {
     [mutate],
   );
 
-  return { platform, vars, shells, backups, loading, busy, refresh, setVariable, deleteVariable, restoreBackup };
+  const importVariables = useCallback(
+    (entries: EnvEntry[], scope: Scope, source: string) =>
+      mutate(
+        () => syncApi.importVariables(entries, scope),
+        `Imported ${plural(entries.length, "variable")} from ${source} ${
+          scope === "user" ? "into your user environment" : "for this session"
+        }.`,
+      ),
+    [mutate],
+  );
+
+  const exportVariables = useCallback(
+    async (path: string, items: ExportItem[]): Promise<boolean> => {
+      setBusy(true);
+      try {
+        const report = await syncApi.exportEnvFile(path, items);
+        notify("success", `Exported ${plural(report.written, "variable")} to ${fileName(report.path)}.`);
+        if (report.skipped.length > 0) {
+          notify("info", `Left out ${report.skipped.map(([k, why]) => `${k} (${why})`).join(", ")}.`);
+        }
+        return true;
+      } catch (e) {
+        fail(e);
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [notify, fail],
+  );
+
+  const syncTerminals = useCallback(async () => {
+    setBusy(true);
+    try {
+      const { report, variables } = await syncApi.syncTerminals();
+      setVars(variables);
+      setSync(await syncApi.terminalSync());
+      notify(
+        "success",
+        report.hooksInstalled > 0
+          ? `Synced. Open terminals pick up ${plural(report.pushed, "variable")} at their next prompt.`
+          : "Synced, but no shell has terminal sync installed yet, so open terminals won't see it.",
+      );
+      if (report.skipped.length > 0) {
+        notify(
+          "info",
+          `${report.skipped.join(", ")} use${report.skipped.length === 1 ? "s" : ""} shell expressions, so only new terminals get ${
+            report.skipped.length === 1 ? "it" : "them"
+          }.`,
+        );
+      }
+    } catch (e) {
+      fail(e);
+    } finally {
+      setBusy(false);
+    }
+  }, [notify, fail]);
+
+  const setHook = useCallback(
+    async (kind: ShellKind, name: string, install: boolean) => {
+      setBusy(true);
+      try {
+        const result = install ? await syncApi.installHook(kind) : await syncApi.removeHook(kind);
+        setSync(result.sync);
+        setBackups(await api.listBackups());
+        notify(
+          "success",
+          install
+            ? `Terminal sync is set up for ${name}. Terminals opened from now on will receive syncs.`
+            : `Removed terminal sync from ${name}.`,
+        );
+        const notice = reusedNotice(result.backups);
+        if (notice) notify("info", notice);
+      } catch (e) {
+        fail(e);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [notify, fail],
+  );
+
+  return {
+    platform,
+    vars,
+    shells,
+    backups,
+    sync,
+    loading,
+    busy,
+    refresh,
+    setVariable,
+    deleteVariable,
+    restoreBackup,
+    importVariables,
+    exportVariables,
+    syncTerminals,
+    setHook,
+  };
 }

@@ -1,12 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BackupsView } from "./components/BackupsView";
+import { ExportModal } from "./components/ExportModal";
+import { ImportModal, type ImportSource } from "./components/ImportModal";
 import { RefreshIcon } from "./components/icons";
 import { IconButton } from "./components/IconButton";
 import { ShellsView } from "./components/ShellsView";
 import { Toasts } from "./components/Toasts";
 import { VariablesView } from "./components/VariablesView";
-import type { PlatformInfo } from "./lib/api";
-import { useEnvironment } from "./lib/useEnvironment";
+import { syncApi, type EnvVar, type PlatformInfo } from "./lib/api";
+import { pickEnvFile, pickExportPath, useFileDrop } from "./lib/files";
+import { formatShort, useEnvironment } from "./lib/useEnvironment";
 import { useToasts } from "./lib/useToasts";
 
 type View = "variables" | "shells" | "backups";
@@ -23,10 +26,40 @@ const isTyping = (el: EventTarget | null) =>
 
 export default function App() {
   const { toasts, push, dismiss } = useToasts();
-  const env = useEnvironment(push);
   const [view, setView] = useState<View>("variables");
+  const openBackups = useCallback(() => setView("backups"), []);
+  const env = useEnvironment(push, openBackups);
   const [creating, setCreating] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // .env import: null = closed, "picking" = modal open without a file yet.
+  const [importing, setImporting] = useState<ImportSource | "picking" | null>(null);
+  const [exporting, setExporting] = useState<EnvVar[] | null>(null);
+  const [dropHover, setDropHover] = useState(false);
+
+  const loadEnvFile = useCallback(
+    async (path: string) => {
+      try {
+        setImporting({ path, parsed: await syncApi.readEnvFile(path) });
+      } catch (e) {
+        push("error", `Couldn't read ${path}: ${String(e)}`);
+      }
+    },
+    [push],
+  );
+  const chooseEnvFile = useCallback(async () => {
+    try {
+      const path = await pickEnvFile();
+      if (path) await loadEnvFile(path);
+    } catch (e) {
+      push("error", String(e));
+    }
+  }, [loadEnvFile, push]);
+
+  // Dropping a file anywhere on the window opens it for import.
+  useFileDrop((path) => void loadEnvFile(path), setDropHover);
+
+  const hooksInstalled = env.sync?.hooks.filter((h) => h.installed).length ?? 0;
 
   // "/" focuses search, "N" starts a new variable.
   useEffect(() => {
@@ -88,8 +121,14 @@ export default function App() {
             {/* Allow line breaks only after path separators (zero-width space). */}
             {storeDescription(env.platform).replace(/([\\/])/g, "$1\u200B")}
           </p>
-          <div className="mt-1 flex items-center justify-between">
-            <span className="text-xs text-faint">{env.loading ? "Reading…" : "Up to date"}</span>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <span className="text-xs text-faint">
+              {env.loading
+                ? "Reading…"
+                : env.sync?.lastSyncedAt
+                  ? `Terminals synced ${formatShort(env.sync.lastSyncedAt)}`
+                  : "Up to date"}
+            </span>
             <IconButton label="Reload from disk" onClick={() => void env.refresh()} disabled={env.loading}>
               <RefreshIcon />
             </IconButton>
@@ -109,14 +148,57 @@ export default function App() {
               searchRef={searchRef}
               onSet={env.setVariable}
               onDelete={env.deleteVariable}
+              onOpenImport={() => setImporting("picking")}
+              onOpenExport={setExporting}
+              hooksInstalled={hooksInstalled}
+              onSync={() => void env.syncTerminals()}
+              onSetUpSync={() => setView("shells")}
             />
           )}
-          {view === "shells" && <ShellsView shells={env.shells} platform={env.platform} />}
+          {view === "shells" && (
+            <ShellsView
+              shells={env.shells}
+              platform={env.platform}
+              sync={env.sync}
+              busy={env.busy}
+              onSetHook={(kind, name, install) => void env.setHook(kind, name, install)}
+            />
+          )}
           {view === "backups" && (
             <BackupsView backups={env.backups} platform={env.platform} busy={env.busy} onRestore={env.restoreBackup} />
           )}
         </div>
       </main>
+
+      {importing && (
+        <ImportModal
+          source={importing === "picking" ? null : importing}
+          vars={env.vars}
+          caseInsensitive={env.platform?.os === "windows"}
+          busy={env.busy}
+          onChooseFile={() => void chooseEnvFile()}
+          onClose={() => setImporting(null)}
+          onImport={env.importVariables}
+        />
+      )}
+      {exporting && (
+        <ExportModal
+          vars={env.vars}
+          initial={exporting}
+          busy={env.busy}
+          onClose={() => setExporting(null)}
+          onExport={async (items) => {
+            const path = await pickExportPath();
+            return path ? env.exportVariables(path, items) : false;
+          }}
+        />
+      )}
+
+      {dropHover && (
+        <div className="pointer-events-none fixed inset-3 z-40 grid place-items-center rounded-xl border-2 border-dashed border-process bg-ink/80">
+          <p className="text-lg font-semibold">Drop a .env file to import it</p>
+        </div>
+      )}
 
       <Toasts toasts={toasts} onDismiss={dismiss} />
     </div>

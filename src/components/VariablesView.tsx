@@ -2,7 +2,7 @@ import { useState, type RefObject } from "react";
 import type { EnvVar, Scope, Status } from "../lib/api";
 import { countByStatus, filterVars, rowId, sortVars, type ScopeFilter, type SortKey, type SortState } from "../lib/filter";
 import { Button } from "./IconButton";
-import { EyeIcon, EyeOffIcon, PlusIcon, SearchIcon } from "./icons";
+import { EyeIcon, EyeOffIcon, PlusIcon, SearchIcon, SyncIcon } from "./icons";
 import { StatusStrip } from "./StatusStrip";
 import { VariableTable } from "./VariableTable";
 
@@ -15,6 +15,12 @@ interface Props {
   searchRef: RefObject<HTMLInputElement | null>;
   onSet: (key: string, value: string, scope: Scope, existed: boolean) => Promise<boolean>;
   onDelete: (key: string, scope: Scope) => Promise<boolean>;
+  onOpenImport: () => void;
+  onOpenExport: (visible: EnvVar[]) => void;
+  /** Number of shells with the terminal-sync hook installed. */
+  hooksInstalled: number;
+  onSync: () => void;
+  onSetUpSync: () => void;
 }
 
 const SCOPES: { value: ScopeFilter; label: string }[] = [
@@ -23,7 +29,21 @@ const SCOPES: { value: ScopeFilter; label: string }[] = [
   { value: "process", label: "Session" },
 ];
 
-export function VariablesView({ vars, loading, busy, creating, setCreating, searchRef, onSet, onDelete }: Props) {
+export function VariablesView({
+  vars,
+  loading,
+  busy,
+  creating,
+  setCreating,
+  searchRef,
+  onSet,
+  onDelete,
+  onOpenImport,
+  onOpenExport,
+  hooksInstalled,
+  onSync,
+  onSetUpSync,
+}: Props) {
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<ScopeFilter>("all");
   const [statuses, setStatuses] = useState<ReadonlySet<Status>>(new Set());
@@ -37,6 +57,7 @@ export function VariablesView({ vars, loading, busy, creating, setCreating, sear
   // Counts follow the scope filter, so the strip always describes what the
   // status buttons would show.
   const counts = countByStatus(vars.filter((v) => scope === "all" || v.scope === scope));
+  const pending = vars.filter((v) => v.scope === "user" && v.status === "persistentOnly").length;
   const rows = sortVars(filterVars(vars, { query, scope, statuses }, isVisible), sort);
   const filtered = query.trim() !== "" || scope !== "all" || statuses.size > 0;
 
@@ -82,9 +103,34 @@ export function VariablesView({ vars, loading, busy, creating, setCreating, sear
           <h1 className="text-xl font-semibold">Variables</h1>
           <p className="mt-1 text-sm text-muted">Your user-level variables, plus any set for this session.</p>
         </div>
-        <Button variant="primary" onClick={() => setCreating(true)} disabled={creating} title="New variable (N)">
-          <PlusIcon /> New variable
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={onOpenImport}>Import .env</Button>
+          <Button onClick={() => onOpenExport(rows)} disabled={vars.length === 0}>
+            Export .env
+          </Button>
+          {hooksInstalled > 0 ? (
+            <Button
+              className="border border-rule"
+              onClick={onSync}
+              disabled={busy}
+              title="Push saved variables into open terminals that have terminal sync"
+            >
+              <SyncIcon />
+              Sync to terminals
+              {pending > 0 && (
+                <span className="ml-0.5 rounded-full bg-persistent/20 px-1.5 font-mono text-xs text-persistent">{pending}</span>
+              )}
+            </Button>
+          ) : (
+            <Button className="border border-rule" onClick={onSetUpSync} title="Install the terminal hook for your shells">
+              <SyncIcon />
+              Set up terminal sync
+            </Button>
+          )}
+          <Button variant="primary" onClick={() => setCreating(true)} disabled={creating} title="New variable (N)">
+            <PlusIcon /> New variable
+          </Button>
+        </div>
       </div>
 
       <StatusStrip counts={counts} active={statuses} onToggle={toggleStatus} onClear={() => setStatuses(new Set())} />

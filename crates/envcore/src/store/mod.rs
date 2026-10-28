@@ -39,6 +39,15 @@ pub trait PersistentStore: Send + Sync {
     /// exactly this value and nothing was written.
     fn set(&self, key: &str, value: &str, backups: &BackupStore) -> Result<Option<BackupOutcome>>;
 
+    /// Create or update several variables with a single backup (used by
+    /// .env import). Every entry is validated before anything is written.
+    fn set_many(
+        &self,
+        entries: &[(String, String)],
+        reason: &str,
+        backups: &BackupStore,
+    ) -> Result<Option<BackupOutcome>>;
+
     /// Delete `key`. Returns the backup taken, or `None` if it wasn't there.
     fn remove(&self, key: &str, backups: &BackupStore) -> Result<Option<BackupOutcome>>;
 }

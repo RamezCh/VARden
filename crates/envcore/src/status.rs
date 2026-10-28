@@ -56,6 +56,22 @@ impl EnvSnapshot {
         }
     }
 
+    pub fn set(&mut self, key: &str, value: impl Into<String>) {
+        let n = self.norm(key);
+        // Keep the existing spelling (e.g. `Path`) when updating.
+        let name = self
+            .vars
+            .get(&n)
+            .map(|(k, _)| k.clone())
+            .unwrap_or_else(|| key.to_string());
+        self.vars.insert(n, (name, value.into()));
+    }
+
+    pub fn remove(&mut self, key: &str) {
+        let n = self.norm(key);
+        self.vars.remove(&n);
+    }
+
     pub fn get(&self, key: &str) -> Option<&str> {
         self.vars.get(&self.norm(key)).map(|(_, v)| v.as_str())
     }

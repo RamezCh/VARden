@@ -29,9 +29,15 @@ fn migrate_legacy_data() {
 pub fn run() {
     migrate_legacy_data();
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // %LOCALAPPDATA%\EnvManager\backups on Windows.
-            app.manage(EnvManager::new(paths::backups_dir()));
+            let manager = EnvManager::new(paths::backups_dir());
+            // Hook scripts embed the sync folder's path; keep them current.
+            if let Err(e) = manager.refresh_hook_scripts() {
+                eprintln!("Could not write terminal hook scripts: {e}");
+            }
+            app.manage(manager);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -43,7 +49,15 @@ pub fn run() {
             commands::get_shell_targets,
             commands::set_shell_targets,
             commands::list_backups,
+            commands::preview_restore,
             commands::restore_backup,
+            commands::get_terminal_sync,
+            commands::install_terminal_hook,
+            commands::remove_terminal_hook,
+            commands::sync_terminals,
+            commands::read_env_file,
+            commands::import_variables,
+            commands::export_env_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Environment Manager");

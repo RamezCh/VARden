@@ -20,6 +20,26 @@ use crate::validate::validate_key;
 
 pub const START_MARKER: &str = "# >>> ENVMANAGER MANAGED BLOCK >>>";
 pub const END_MARKER: &str = "# <<< END ENVMANAGER MANAGED BLOCK <<<";
+
+/// A pair of marker lines delimiting a section the app owns.
+#[derive(Debug, Clone, Copy)]
+pub struct Markers {
+    pub start: &'static str,
+    pub end: &'static str,
+}
+
+/// The variables block.
+pub const VARIABLES: Markers = Markers {
+    start: START_MARKER,
+    end: END_MARKER,
+};
+
+/// The terminal-sync hook, kept separate so it can be installed and removed
+/// on its own (and on Windows, where variables aren't written to profiles).
+pub const HOOK: Markers = Markers {
+    start: "# >>> ENVMANAGER SHELL HOOK >>>",
+    end: "# <<< END ENVMANAGER SHELL HOOK <<<",
+};
 const NOTICE: &str =
     "# Managed by Environment Manager. Manual edits inside this block may be overwritten.";
 
@@ -136,12 +156,12 @@ struct Span {
     end: usize,
 }
 
-fn locate(lines: &[&str]) -> Result<Option<Span>, String> {
+fn locate(lines: &[&str], m: Markers) -> Result<Option<Span>, String> {
     let starts: Vec<usize> = (0..lines.len())
-        .filter(|&i| lines[i].trim() == START_MARKER)
+        .filter(|&i| lines[i].trim() == m.start)
         .collect();
     let ends: Vec<usize> = (0..lines.len())
-        .filter(|&i| lines[i].trim() == END_MARKER)
+        .filter(|&i| lines[i].trim() == m.end)
         .collect();
     match (starts.as_slice(), ends.as_slice()) {
         ([], []) => Ok(None),
@@ -156,7 +176,7 @@ fn locate(lines: &[&str]) -> Result<Option<Span>, String> {
 /// Parse the managed block out of `content` (already `\n`-normalised).
 pub fn read_block(content: &str, syntax: Syntax) -> Result<Option<Block>, String> {
     let lines: Vec<&str> = content.lines().collect();
-    let Some(span) = locate(&lines)? else {
+    let Some(span) = locate(&lines, VARIABLES)? else {
         return Ok(None);
     };
     let mut block = Block::default();
@@ -175,9 +195,23 @@ pub fn read_block(content: &str, syntax: Syntax) -> Result<Option<Block>, String
 /// * No block yet → appended at the end, separated by a blank line.
 /// * Empty `block` → the block (markers included) is removed.
 pub fn write_block(content: &str, syntax: Syntax, block: &Block) -> Result<String, String> {
+    replace_section(content, VARIABLES, &render_block(syntax, block))
+}
+
+/// Whether `content` contains the section delimited by `m`.
+pub fn has_section(content: &str, m: Markers) -> Result<bool, String> {
     let lines: Vec<&str> = content.lines().collect();
-    let span = locate(&lines)?;
-    let rendered = render_block(syntax, block);
+    Ok(locate(&lines, m)?.is_some())
+}
+
+/// Replace the section delimited by `m` with `rendered` (which includes its
+/// own marker lines). An empty `rendered` removes the section. Content
+/// outside the section is never touched.
+pub fn replace_section(content: &str, m: Markers, rendered: &[String]) -> Result<String, String> {
+    let lines: Vec<&str> = content.lines().collect();
+    let span = locate(&lines, m)?;
+    let rendered = rendered.to_vec();
+    let removing = rendered.is_empty();
 
     let mut out: Vec<String> = Vec::with_capacity(lines.len() + rendered.len() + 1);
     match span {
@@ -185,14 +219,14 @@ pub fn write_block(content: &str, syntax: Syntax, block: &Block) -> Result<Strin
             out.extend(lines[..span.start].iter().map(|s| s.to_string()));
             out.extend(rendered);
             out.extend(lines[span.end + 1..].iter().map(|s| s.to_string()));
-            if block.is_empty() {
+            if removing {
                 // Don't leave a dangling blank separator at the end of the file.
                 while out.last().is_some_and(|l| l.trim().is_empty()) {
                     out.pop();
                 }
             }
         }
-        None if block.is_empty() => return Ok(content.to_string()),
+        None if removing => return Ok(content.to_string()),
         None => {
             out.extend(lines.iter().map(|s| s.to_string()));
             while out.last().is_some_and(|l| l.trim().is_empty()) {

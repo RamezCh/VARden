@@ -97,16 +97,33 @@ impl PersistentStore for ShellFileStore {
     }
 
     fn set(&self, key: &str, value: &str, backups: &BackupStore) -> Result<Option<BackupOutcome>> {
-        validate_key(key)?;
-        validate_value(key, value)?;
-        if self.syntax != Syntax::Nushell && value.contains(['\n', '\r']) {
-            return Err(Error::InvalidValue {
-                key: key.into(),
-                reason: "multi-line values can't be stored in this shell file".into(),
-            });
+        self.set_many(
+            &[(key.to_string(), value.to_string())],
+            &format!("Before setting {key}"),
+            backups,
+        )
+    }
+
+    fn set_many(
+        &self,
+        entries: &[(String, String)],
+        reason: &str,
+        backups: &BackupStore,
+    ) -> Result<Option<BackupOutcome>> {
+        for (key, value) in entries {
+            validate_key(key)?;
+            validate_value(key, value)?;
+            if self.syntax != Syntax::Nushell && value.contains(['\n', '\r']) {
+                return Err(Error::InvalidValue {
+                    key: key.clone(),
+                    reason: "multi-line values can't be stored in this shell file".into(),
+                });
+            }
         }
-        self.modify(&format!("Before setting {key}"), backups, |b| {
-            b.set(key, value)
+        self.modify(reason, backups, |b| {
+            for (key, value) in entries {
+                b.set(key, value);
+            }
         })
     }
 

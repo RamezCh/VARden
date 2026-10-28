@@ -19,6 +19,18 @@ export function Toasts({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id:
         >
           <span className={`w-1 self-stretch ${BAR[t.kind]}`} />
           <p className="flex-1 py-0.5">{t.text}</p>
+          {t.action && (
+            <button
+              type="button"
+              onClick={() => {
+                onDismiss(t.id);
+                t.action?.run();
+              }}
+              className="shrink-0 rounded-md px-2 py-0.5 text-sm font-semibold text-process hover:bg-process/10"
+            >
+              {t.action.label}
+            </button>
+          )}
           <IconButton label="Dismiss" onClick={() => onDismiss(t.id)}>
             <XIcon />
           </IconButton>

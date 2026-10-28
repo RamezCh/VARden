@@ -8,7 +8,11 @@ use std::borrow::Cow;
 use std::io;
 use std::iter::once;
 
-use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_WRITE, REG_EXPAND_SZ, REG_SZ};
+use std::collections::BTreeMap;
+
+use winreg::enums::{
+    HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, KEY_WRITE, REG_EXPAND_SZ, REG_SZ,
+};
 use winreg::types::FromRegValue;
 use winreg::{RegKey, RegValue};
 
@@ -123,26 +127,54 @@ impl PersistentStore for RegistryStore {
     }
 
     fn set(&self, key: &str, value: &str, backups: &BackupStore) -> Result<Option<BackupOutcome>> {
-        validate_key(key)?;
-        validate_value(key, value)?;
-        let current = self.list()?;
-        let existing = Self::find(&current, key);
+        self.set_many(
+            &[(key.to_string(), value.to_string())],
+            &format!("Before setting {key}"),
+            backups,
+        )
+    }
 
-        // Keep REG_EXPAND_SZ if the value already was one (PATH usually is);
-        // otherwise only use it when the value actually references %VARS%.
-        let kind = match existing {
-            Some(v) if v.kind == ValueKind::ExpandString => ValueKind::ExpandString,
-            _ if references_variables(value) => ValueKind::ExpandString,
-            _ => ValueKind::String,
-        };
-        if existing.is_some_and(|v| v.value == value && v.kind == kind) {
+    fn set_many(
+        &self,
+        entries: &[(String, String)],
+        reason: &str,
+        backups: &BackupStore,
+    ) -> Result<Option<BackupOutcome>> {
+        for (key, value) in entries {
+            validate_key(key)?;
+            validate_value(key, value)?;
+        }
+        let current = self.list()?;
+
+        let mut writes: Vec<(String, &str, ValueKind)> = Vec::new();
+        for (key, value) in entries {
+            let existing = Self::find(&current, key);
+            // Keep REG_EXPAND_SZ if the value already was one (PATH usually is);
+            // otherwise only use it when the value actually references %VARS%.
+            let kind = match existing {
+                Some(v) if v.kind == ValueKind::ExpandString => ValueKind::ExpandString,
+                _ if references_variables(value) => ValueKind::ExpandString,
+                _ => ValueKind::String,
+            };
+            if existing.is_some_and(|v| v.value == *value && v.kind == kind) {
+                continue;
+            }
+            // Reuse the existing name's casing so we never create `path` next to `Path`.
+            let name = existing
+                .map(|v| v.key.clone())
+                .unwrap_or_else(|| key.clone());
+            writes.retain(|(n, _, _)| !n.eq_ignore_ascii_case(&name));
+            writes.push((name, value.as_str(), kind));
+        }
+        if writes.is_empty() {
             return Ok(None);
         }
-        // Reuse the existing name's casing so we never create `path` next to `Path`.
-        let name = existing.map(|v| v.key.as_str()).unwrap_or(key);
 
-        let backup = backups.backup_registry(&current, &format!("Before setting {key}"))?;
-        Self::write_value(&Self::open_write()?, name, value, kind)?;
+        let backup = backups.backup_registry(&current, reason)?;
+        let reg = Self::open_write()?;
+        for (name, value, kind) in writes {
+            Self::write_value(&reg, &name, value, kind)?;
+        }
         broadcast_environment_change();
         Ok(Some(backup))
     }
@@ -184,6 +216,36 @@ pub fn broadcast_environment_change() {
             );
         }
     });
+}
+
+/// Machine-level variables (read-only; reading HKLM needs no elevation),
+/// expanded. Used so that deleting a user variable that shadows a machine
+/// variable restores the machine value in synced terminals.
+pub fn system_environment() -> BTreeMap<String, String> {
+    let Ok(key) = RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey_with_flags(
+        r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment",
+        KEY_READ,
+    ) else {
+        return BTreeMap::new();
+    };
+    key.enum_values()
+        .filter_map(|item| item.ok())
+        .filter_map(|(name, raw)| {
+            let expand = raw.vtype == REG_EXPAND_SZ;
+            if raw.vtype != REG_SZ && !expand {
+                return None;
+            }
+            let value = String::from_reg_value(&raw).ok()?;
+            Some((
+                name,
+                if expand {
+                    expand_env_strings(&value)
+                } else {
+                    value
+                },
+            ))
+        })
+        .collect()
 }
 
 /// Expand `%VARS%` using this process's environment (like Windows does when

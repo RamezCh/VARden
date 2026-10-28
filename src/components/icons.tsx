@@ -75,3 +75,8 @@ export const SortIcon = ({ dir, ...p }: P & { dir: "asc" | "desc" | null }) => (
     <path d="M5 9.5l3 3 3-3" opacity={dir === "desc" ? 1 : 0.3} />
   </svg>
 );
+export const SyncIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M2.5 6.5A5.5 5.5 0 0 1 12.6 4.2M13.5 2v2.5H11M13.5 9.5A5.5 5.5 0 0 1 3.4 11.8M2.5 14v-2.5H5" />
+  </svg>
+);
