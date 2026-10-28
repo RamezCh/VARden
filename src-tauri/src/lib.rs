@@ -3,7 +3,6 @@ mod commands;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use envcore::backup::BackupStore;
 use envcore::manager::EnvManager;
 use envcore::{paths, watch};
 use tauri::{AppHandle, Emitter, Manager};
@@ -12,25 +11,13 @@ use tauri_plugin_log::{RotationStrategy, Target, TargetKind};
 /// Event the frontend listens to; it refreshes the dashboard.
 const ENV_CHANGED: &str = "environment-changed";
 
-/// Builds before the rename kept backups under the bundle identifier
-/// (`dev.chreide.envmanager`). Move them, originals included, then remove
-/// the old folder, which only held those backups and the WebView cache.
+/// Earlier builds kept their files in `EnvManager` or
+/// `dev.chreide.envmanager`. Move backups (originals included), sync state
+/// and hook scripts into the VARden folder, then remove the old folders.
 fn migrate_legacy_data() {
-    let Some(legacy) = paths::legacy_data_dir() else {
-        return;
-    };
-    if !legacy.exists() {
-        return;
-    }
-    match BackupStore::new(paths::backups_dir()).adopt_from(&legacy.join("backups")) {
-        Ok(moved) => {
-            log::info!("Moved {moved} backup(s) from {}", legacy.display());
-            let _ = std::fs::remove_dir_all(&legacy);
-        }
-        Err(e) => log::error!(
-            "Keeping {}: could not move all backups: {e}",
-            legacy.display()
-        ),
+    match paths::migrate_legacy(&paths::app_data_dir(), &paths::legacy_data_dirs()) {
+        Ok(done) => done.iter().for_each(|d| log::info!("Migration: {d}")),
+        Err(e) => log::error!("Migration from an older version stopped: {e}"),
     }
 }
 
@@ -49,7 +36,7 @@ fn log_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
         .targets([
             Target::new(TargetKind::Folder {
                 path: paths::logs_dir(),
-                file_name: Some("envmanager".into()),
+                file_name: Some("varden".into()),
             }),
             Target::new(TargetKind::Stdout),
         ])
@@ -88,17 +75,21 @@ pub fn run() {
         .setup(|app| {
             log_panics();
             log::info!(
-                "Environment Manager {} starting on {}",
+                "VARden {} starting on {}",
                 app.package_info().version,
                 std::env::consts::OS
             );
             migrate_legacy_data();
 
-            // %LOCALAPPDATA%\EnvManager\backups on Windows.
+            // %LOCALAPPDATA%\VARden\backups on Windows.
             let manager = EnvManager::new(paths::backups_dir());
-            // Hook scripts embed the sync folder's path; keep them current.
-            if let Err(e) = manager.refresh_hook_scripts() {
-                log::error!("Could not write terminal hook scripts: {e}");
+            // Hook scripts embed the sync folder's path, and installed hooks
+            // point at them: keep both current (e.g. after the rename).
+            match manager.refresh_installed_hooks() {
+                Ok(updated) => updated
+                    .iter()
+                    .for_each(|p| log::info!("Updated terminal sync in {}", p.display())),
+                Err(e) => log::error!("Could not update terminal hooks: {e}"),
             }
 
             // Refresh the dashboard when variables change outside the app.
@@ -138,5 +129,5 @@ pub fn run() {
             commands::open_logs_folder,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running Environment Manager");
+        .expect("error while running VARden");
 }

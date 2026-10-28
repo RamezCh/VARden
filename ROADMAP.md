@@ -9,6 +9,7 @@ Phases 1–3 of the original spec (backend core, dashboard, terminal sync, `.env
 - [x] CI on Windows, macOS and Linux: formatting, lints, Rust and frontend tests, and a full app build.
 
 ## Stage 2: Validation
+- [x] Rename the app to VARden, moving existing data and upgrading blocks already written to startup files.
 - [ ] Flag values that point to folders or files that don't exist (PATH entries, `JAVA_HOME` and similar) as 🔴.
 - [ ] Show the expanded value next to `%VAR%` values.
 - [ ] More help text for newcomers, including what happens to temporary variables when the app closes.

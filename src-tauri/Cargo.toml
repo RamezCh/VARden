@@ -1,13 +1,13 @@
 [package]
-name = "envmanager"
-description = "Environment Manager — user & process level environment variables"
+name = "varden"
+description = "VARden: manage user and temporary environment variables safely"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [lib]
 # Tauri convention: the app logic lives in a lib so main.rs stays tiny.
-name = "envmanager_lib"
+name = "varden_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

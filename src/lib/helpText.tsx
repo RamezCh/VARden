@@ -63,7 +63,7 @@ export const HELP: Record<string, ReactNode> = {
   ),
   original: (
     <p>
-      The state from before Environment Manager changed anything. It can't be deleted, so you can always go back to how
+      The state from before VARden changed anything. It can't be deleted, so you can always go back to how
       things were.
     </p>
   ),

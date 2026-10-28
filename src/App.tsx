@@ -97,7 +97,7 @@ export default function App() {
             <circle cx="11" cy="14" r="2" fill="var(--color-persistent)" />
             <circle cx="15" cy="14" r="2" fill="var(--color-process)" />
           </svg>
-          <span className="font-semibold leading-tight">Environment Manager</span>
+          <span className="text-lg font-semibold leading-tight tracking-tight">VARden</span>
         </div>
 
         <nav aria-label="Sections" className="mt-7 flex flex-col gap-0.5">

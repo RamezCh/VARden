@@ -1,6 +1,6 @@
 [package]
 name = "envcore"
-description = "Platform core for Environment Manager: user-level env storage, managed shell blocks, backups and shell detection."
+description = "Platform core for VARden: user-level env storage, managed shell blocks, backups and shell detection."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -206,7 +206,7 @@ pub fn render_entry(e: &EnvEntry) -> String {
 
 pub fn render(entries: &[EnvEntry]) -> String {
     let mut out = format!(
-        "# Exported by Environment Manager on {}\n",
+        "# Exported by VARden on {}\n",
         chrono::Local::now().format("%Y-%m-%d %H:%M")
     );
     for e in entries {

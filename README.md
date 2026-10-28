@@ -1,28 +1,28 @@
-# Environment Manager
+# VARden
 
 [![CI](https://github.com/RamezCh/VARden/actions/workflows/ci.yml/badge.svg)](https://github.com/RamezCh/VARden/actions/workflows/ci.yml)
 
-A Tauri 2 desktop app for managing **user-level** (persistent) and **temporary** environment variables (pushed into open terminals, never saved). It never writes system-level variables, so it never needs admin rights.
+VARden is a Tauri 2 desktop app for managing **user-level** (persistent) and **temporary** environment variables (pushed into open terminals, never saved). It never writes system-level variables, so it never needs admin rights.
 
 ## Layout
 
 ```
 crates/envcore/        Platform core: plain Rust, no Tauri, fully unit-tested
-  src/managed_block.rs   Finds, parses and rewrites the "# >>> ENVMANAGER MANAGED BLOCK >>>" block
+  src/managed_block.rs   Finds, parses and rewrites the "# >>> VARDEN MANAGED BLOCK >>>" block
   src/store/             Where user-level vars persist
     windows_registry.rs    HKCU\Environment + WM_SETTINGCHANGE broadcast   (Windows)
     shell_file.rs          Managed block inside .bashrc / .zshrc / config.fish / env.nu / $PROFILE
   src/backup.rs          Timestamped backups before every write, restore, pruning
   src/shells.rs          Shell + profile auto-detection
   src/status.rs          Status pill logic (Active & Synced / Persistent Only / Process Only / Missing)
-  src/manager.rs         EnvManager: the API the Tauri commands call
+  src/manager.rs         EnvManager (core API): what the Tauri commands call
   src/sync.rs            Terminal sync: plan, per-shell hook and apply scripts (tested in real shells)
   src/terminal.rs        Hook install/remove in profiles, Sync to terminals
   src/dotenv.rs          .env parser and writer
   src/transfer.rs        .env import/export
-  src/paths.rs           App data folder (%LOCALAPPDATA%\EnvManager)
+  src/paths.rs           App data folder (%LOCALAPPDATA%\VARden)
   src/watch.rs           Notices outside changes (registry notifications, file watcher)
-src-tauri/             Tauri app: commands.rs wraps EnvManager
+src-tauri/             Tauri app (binary `varden`): commands.rs wraps the core API
 src/                   React + Tailwind v4 frontend
   lib/api.ts             Typed wrappers for every Tauri command
   lib/useEnvironment.ts  Owns all data and mutations; the table is always replaced by what the backend returns
@@ -53,7 +53,7 @@ npm run tauri build      # installer in target/release/bundle
 - **Malformed blocks are never touched.** If a start or end marker is missing or duplicated, every write to that file is refused with an explanation, until you fix the file or restore a backup.
 - **Safe file writes.** The app writes a temp file and renames it into place. It follows symlinks, so dotfile managers keep working, and it keeps the BOM, CRLF line endings and file permissions as they were. If a write wouldn't change anything, it is skipped and no backup is made.
 - **Registry details.** An existing `REG_EXPAND_SZ` value (such as `Path`) keeps its type. New values that contain `%VAR%` become `REG_EXPAND_SZ`. Name matching ignores case, so the app never creates `path` next to an existing `Path`. The `WM_SETTINGCHANGE` broadcast runs on a background thread so a hung window can't freeze the UI.
-- **Backups.** Before every change, the app saves a copy of the file, or a JSON snapshot of all of `HKCU\Environment`, to `%LOCALAPPDATA%\EnvManager\backups\<timestamp>\` (on macOS `~/Library/Application Support/EnvManager/backups`, on Linux `~/.local/share/EnvManager/backups`). The first backup of each file (and of the registry) is its **original** state from before the app touched it, and it is never pruned. Only distinct states are kept: if the same content was already backed up, no new backup is written and the app says which existing backup already holds that state. Besides the original, the 50 newest backups per target are kept. Restoring a backup first backs up the current state, so a restore can itself be undone.
+- **Backups.** Before every change, the app saves a copy of the file, or a JSON snapshot of all of `HKCU\Environment`, to `%LOCALAPPDATA%\VARden\backups\<timestamp>\` (on macOS `~/Library/Application Support/VARden/backups`, on Linux `~/.local/share/VARden/backups`). The first backup of each file (and of the registry) is its **original** state from before the app touched it, and it is never pruned. Only distinct states are kept: if the same content was already backed up, no new backup is written and the app says which existing backup already holds that state. Besides the original, the 50 newest backups per target are kept. Restoring a backup first backs up the current state, so a restore can itself be undone.
 - **Status semantics.** "Current" means the environment the app was launched with, plus any process-level variables set in the app. A variable you just saved therefore shows 🟡 *Persistent Only* until the app is restarted, because that is also true for terminals that are already open. For `PATH`, the status counts as synced when every user entry appears in the process PATH. (On Windows the process PATH is the system PATH plus the user PATH.)
 - **Windows uses only the registry.** PowerShell, cmd and Git Bash all inherit `HKCU\Environment`, so profile files are only detected, not written. On macOS and Linux the default target is your login shell's rc file, and `set_shell_targets` can add or swap files.
 
@@ -68,11 +68,11 @@ npm run tauri build      # installer in target/release/bundle
 
 ## Phase 3: terminal sync, .env bridge, recovery
 
-- **Terminal sync.** On the Shells page, **Install** adds a short block to that shell's profile, marked `# >>> ENVMANAGER SHELL HOOK >>>`, and backs the profile up first. The block sources a small hook script from `%LOCALAPPDATA%\EnvManager\shell`. **Sync to terminals** writes per-shell apply scripts to `EnvManager\sync` and then bumps a generation number. Before drawing its next prompt, each hooked terminal reads that number (one small file read) and applies the changes if it has moved. This works for PowerShell 7, Windows PowerShell, Git Bash, bash, zsh and fish. Command Prompt has no prompt hook and Nushell isn't supported yet, so open a new window for those.
+- **Terminal sync.** On the Shells page, **Install** adds a short block to that shell's profile, marked `# >>> VARDEN SHELL HOOK >>>`, and backs the profile up first. The block sources a small hook script from `%LOCALAPPDATA%\VARden\shell`. **Sync to terminals** writes per-shell apply scripts to `VARden\sync` and then bumps a generation number. Before drawing its next prompt, each hooked terminal reads that number (one small file read) and applies the changes if it has moved. This works for PowerShell 7, Windows PowerShell, Git Bash, bash, zsh and fish. Command Prompt has no prompt hook and Nushell isn't supported yet, so open a new window for those.
   - Apply scripts always describe the full desired state, so a terminal that missed several syncs still ends up correct, and variables deleted since an earlier sync are removed. On Windows, deleting a user variable that overrides a machine variable brings back the machine value.
   - PATH is merged entry by entry instead of overwritten, so an activated virtualenv or conda environment survives a sync.
   - A new terminal starts with your saved variables already, so its hook only applies syncs made after it opened.
-  - The spec suggested `eval "$(envmanager hook)"`. The profile sources a static script instead, so nothing has to be on PATH and starting a shell never launches the app.
+  - The spec suggested `eval "$(envmanager hook)"` (the project's working title). The profile sources a static script instead, so nothing has to be on PATH and starting a shell never launches the app.
 - **.env import.** Use **Import .env**, or drop a file anywhere on the window. You see every variable first, marked *New*, *Replaces current value* or *Unchanged* (unchanged ones start unticked), plus any lines that couldn't be read and why. You choose the user environment or this session. The import is written with one backup and can be undone in one step.
 - **.env export.** Pick variables, preselected from what the table is currently showing, then choose where to save. You're warned when secrets would be written as plain text. Windows `%VAR%` values are written expanded.
 - **Recovery.** Before a restore, the Backups page lists exactly which variables would come back, change or be removed. Every change's toast has **Undo**. An error about a damaged managed block offers a shortcut to Backups.
@@ -81,10 +81,14 @@ npm run tauri build      # installer in target/release/bundle
 
 - **One instance.** Launching the app while it's already running brings the open window to the front instead of starting a second copy, so two windows can never write at the same time.
 - **Automatic refresh.** Changes made outside the app (`setx`, the Windows dialog, an editor saving `.zshrc`) show up on their own. On Windows the app subscribes to change notifications for `HKCU\Environment`. On every platform it watches the folders that hold the startup files, which also catches editors that save by replacing the file. Bursts of events become one refresh, and the echo of the app's own writes is ignored. The window also refreshes when it regains focus, and a notice appears when something changed.
-- **Log file.** Diagnostics are written to `%LOCALAPPDATA%\EnvManager\logs` (macOS `~/Library/Application Support/EnvManager/logs`, Linux `~/.local/share/EnvManager/logs`): at most 5 files of 1 MB each. Logs contain variable names and actions, never values. **Open log folder** in the sidebar opens it.
+- **Log file.** Diagnostics are written to `%LOCALAPPDATA%\VARden\logs` (macOS `~/Library/Application Support/VARden/logs`, Linux `~/.local/share/VARden/logs`): at most 5 files of 1 MB each. Logs contain variable names and actions, never values. **Open log folder** in the sidebar opens it.
 - **CI.** Every push runs formatting, clippy, Rust and frontend tests and a full app build on Windows, macOS and Linux, including the terminal hook in real bash, zsh, fish and PowerShell.
 
 See [ROADMAP.md](ROADMAP.md) for what comes next.
+
+## Renamed to VARden
+
+Earlier builds were called *Environment Manager*. On first start, VARden moves their data (backups including originals, sync state, hook scripts) from `%LOCALAPPDATA%\EnvManager` into `%LOCALAPPDATA%\VARden` and removes the old folder. Blocks in startup files written with the old `ENVMANAGER` markers are still recognised and are rewritten with `VARDEN` markers on the next change. Installed terminal-sync hooks are updated to the new location right away, with a backup first.
 
 ## Backups page and help
 

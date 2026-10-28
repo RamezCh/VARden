@@ -54,7 +54,7 @@ pub struct BackupEntry {
     pub reason: String,
     pub size_bytes: u64,
     /// The first backup ever taken of this target, i.e. its state before
-    /// Environment Manager touched it. Never pruned. Computed by `list`.
+    /// VARden touched it. Never pruned. Computed by `list`.
     #[serde(default)]
     pub original: bool,
 }

@@ -4,9 +4,9 @@
 //! lines; everything outside them is left byte-for-byte untouched:
 //!
 //! ```bash
-//! # >>> ENVMANAGER MANAGED BLOCK >>>
+//! # >>> VARDEN MANAGED BLOCK >>>
 //! export OPENAI_API_KEY='sk-...'
-//! # <<< END ENVMANAGER MANAGED BLOCK <<<
+//! # <<< END VARDEN MANAGED BLOCK <<<
 //! ```
 //!
 //! Values are always written *literally* (single-quoted where the shell
@@ -18,29 +18,41 @@ use serde::{Deserialize, Serialize};
 
 use crate::validate::validate_key;
 
-pub const START_MARKER: &str = "# >>> ENVMANAGER MANAGED BLOCK >>>";
-pub const END_MARKER: &str = "# <<< END ENVMANAGER MANAGED BLOCK <<<";
+pub const START_MARKER: &str = "# >>> VARDEN MANAGED BLOCK >>>";
+pub const END_MARKER: &str = "# <<< END VARDEN MANAGED BLOCK <<<";
 
-/// A pair of marker lines delimiting a section the app owns.
+/// A pair of marker lines delimiting a section the app owns. Blocks written
+/// before the rename to VARden used the `legacy` markers; they are still
+/// recognised and are rewritten with the current markers on the next write.
 #[derive(Debug, Clone, Copy)]
 pub struct Markers {
     pub start: &'static str,
     pub end: &'static str,
+    pub legacy: (&'static str, &'static str),
 }
 
 /// The variables block.
 pub const VARIABLES: Markers = Markers {
     start: START_MARKER,
     end: END_MARKER,
+    legacy: (
+        "# >>> ENVMANAGER MANAGED BLOCK >>>",
+        "# <<< END ENVMANAGER MANAGED BLOCK <<<",
+    ),
 };
 
 /// The terminal-sync hook, kept separate so it can be installed and removed
 /// on its own (and on Windows, where variables aren't written to profiles).
 pub const HOOK: Markers = Markers {
-    start: "# >>> ENVMANAGER SHELL HOOK >>>",
-    end: "# <<< END ENVMANAGER SHELL HOOK <<<",
+    start: "# >>> VARDEN SHELL HOOK >>>",
+    end: "# <<< END VARDEN SHELL HOOK <<<",
+    legacy: (
+        "# >>> ENVMANAGER SHELL HOOK >>>",
+        "# <<< END ENVMANAGER SHELL HOOK <<<",
+    ),
 };
-const NOTICE: &str =
+const NOTICE: &str = "# Managed by VARden. Manual edits inside this block may be overwritten.";
+const LEGACY_NOTICE: &str =
     "# Managed by Environment Manager. Manual edits inside this block may be overwritten.";
 
 /// Which assignment syntax a config file speaks.
@@ -157,11 +169,15 @@ struct Span {
 }
 
 fn locate(lines: &[&str], m: Markers) -> Result<Option<Span>, String> {
+    let is = |i: usize, current: &str, legacy: &str| {
+        let t = lines[i].trim();
+        t == current || t == legacy
+    };
     let starts: Vec<usize> = (0..lines.len())
-        .filter(|&i| lines[i].trim() == m.start)
+        .filter(|&i| is(i, m.start, m.legacy.0))
         .collect();
     let ends: Vec<usize> = (0..lines.len())
-        .filter(|&i| lines[i].trim() == m.end)
+        .filter(|&i| is(i, m.end, m.legacy.1))
         .collect();
     match (starts.as_slice(), ends.as_slice()) {
         ([], []) => Ok(None),
@@ -182,7 +198,7 @@ pub fn read_block(content: &str, syntax: Syntax) -> Result<Option<Block>, String
     let mut block = Block::default();
     for raw in &lines[span.start + 1..span.end] {
         let t = raw.trim();
-        if t.is_empty() || t == NOTICE {
+        if t.is_empty() || t == NOTICE || t == LEGACY_NOTICE {
             continue;
         }
         block.lines.push(parse_line(raw, syntax));
@@ -635,5 +651,21 @@ mod tests {
         let content = format!("  {START_MARKER}\n  export A='1'\n  {END_MARKER}\n");
         let b = read_block(&content, Syntax::Posix).unwrap().unwrap();
         assert_eq!(b.entries(), vec![("A".into(), "1".into())]);
+    }
+
+    #[test]
+    fn legacy_blocks_are_read_and_upgraded() {
+        let legacy = "keep\n\n# >>> ENVMANAGER MANAGED BLOCK >>>\n# Managed by Environment Manager. Manual edits inside this block may be overwritten.\nexport A='1'\n# <<< END ENVMANAGER MANAGED BLOCK <<<\n";
+        let mut block = read_block(legacy, Syntax::Posix).unwrap().unwrap();
+        assert_eq!(block.entries(), vec![("A".into(), "1".into())]);
+        block.set("B", "2");
+        let out = write_block(legacy, Syntax::Posix, &block).unwrap();
+        assert_eq!(
+            out,
+            format!("keep\n\n{START_MARKER}\n{NOTICE}\nexport A='1'\nexport B='2'\n{END_MARKER}\n")
+        );
+        // An old and a new block in one file is ambiguous: refuse to touch it.
+        let both = format!("{legacy}{START_MARKER}\n{END_MARKER}\n");
+        assert!(read_block(&both, Syntax::Posix).is_err());
     }
 }

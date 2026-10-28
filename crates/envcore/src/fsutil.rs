@@ -85,7 +85,7 @@ pub fn write_atomic(path: &Path, data: &[u8]) -> Result<()> {
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| "file".into());
-    let tmp = target.with_file_name(format!(".{file_name}.envmanager-tmp"));
+    let tmp = target.with_file_name(format!(".{file_name}.varden-tmp"));
 
     let result = (|| {
         let mut f = fs::File::create(&tmp).map_err(|e| Error::io(&tmp, e))?;

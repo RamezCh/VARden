@@ -56,7 +56,7 @@ export interface BackupEntry {
   target: BackupTarget;
   reason: string;
   sizeBytes: number;
-  /** The target's state before Environment Manager first changed it. Never pruned. */
+  /** The target's state before VARden first changed it. Never pruned. */
   original: boolean;
 }
 

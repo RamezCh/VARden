@@ -64,8 +64,7 @@ fn hook_shell(kind: ShellKind) -> std::result::Result<HookShell, &'static str> {
     }
 }
 
-const NOTICE: &str =
-    "# Applies variables from Environment Manager's \"Sync to terminals\" before each prompt.";
+const NOTICE: &str = "# Applies variables from VARden's \"Sync to terminals\" before each prompt.";
 
 impl EnvManager {
     fn hook_section(&self, shell: HookShell) -> Vec<String> {
@@ -149,6 +148,35 @@ impl EnvManager {
             &self.hook_section(shell),
             "Before installing terminal sync",
         )
+    }
+
+    /// Rewrite installed hooks whose block is out of date (an older marker
+    /// name or hook location, e.g. after the rename to VARden). Profiles
+    /// without the hook are left alone. Returns the profiles updated.
+    pub fn refresh_installed_hooks(&self) -> Result<Vec<PathBuf>> {
+        self.refresh_hook_scripts()?;
+        let mut updated = Vec::new();
+        for s in shells::detect() {
+            let (Ok(shell), Some(path)) = (hook_shell(s.kind), s.config_path) else {
+                continue;
+            };
+            let installed = fsutil::read_text(&path)
+                .ok()
+                .and_then(|f| managed_block::has_section(&f.content, HOOK).ok())
+                .unwrap_or(false);
+            if installed
+                && self
+                    .edit_profile(
+                        &path,
+                        &self.hook_section(shell),
+                        "Before updating terminal sync",
+                    )?
+                    .is_some()
+            {
+                updated.push(path);
+            }
+        }
+        Ok(updated)
     }
 
     pub fn uninstall_hook(&self, kind: ShellKind) -> Result<Option<BackupOutcome>> {
@@ -450,7 +478,7 @@ mod tests {
             "idempotent"
         );
         let content = std::fs::read_to_string(&profile).unwrap();
-        assert!(content.starts_with("echo user-line\n\n# >>> ENVMANAGER SHELL HOOK >>>"));
+        assert!(content.starts_with("echo user-line\n\n# >>> VARDEN SHELL HOOK >>>"));
 
         // Sync 1 is live when the shell starts; sync 2 is staged and copied
         // in while the shell runs, as if the user clicked "Sync" meanwhile.
@@ -472,7 +500,7 @@ mod tests {
         let script = r#". "$PROFILE_FILE"
 printf '%s\n' "${FRESH-unset}"
 cp "$STAGE"/* "$SYNC"/
-__envmanager_apply
+__varden_apply
 printf '%s\n' "${FRESH-unset}"
 "#;
         for (shell, flag) in [("bash", "--norc"), ("zsh", "-f")] {
@@ -495,6 +523,19 @@ printf '%s\n' "${FRESH-unset}"
                 String::from_utf8_lossy(&out.stderr)
             );
         }
+
+        // A block from before the rename is upgraded in place, not duplicated.
+        let legacy = std::fs::read_to_string(&profile)
+            .unwrap()
+            .replace("VARDEN SHELL HOOK", "ENVMANAGER SHELL HOOK");
+        std::fs::write(&profile, &legacy).unwrap();
+        assert!(m
+            .install_into(&profile, HookShell::Posix)
+            .unwrap()
+            .is_some());
+        let upgraded = std::fs::read_to_string(&profile).unwrap();
+        assert_eq!(upgraded.matches("SHELL HOOK >>>").count(), 1);
+        assert!(upgraded.contains("# >>> VARDEN SHELL HOOK >>>"));
 
         m.uninstall_hook_from(&profile).unwrap();
         assert_eq!(

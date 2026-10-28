@@ -1,7 +1,7 @@
-//! Platform core for Environment Manager.
+//! Platform core for VARden.
 //!
 //! Everything in here is plain Rust with no Tauri dependency, so it can be
-//! unit-tested on any machine and reused by a future CLI (`envmanager hook`).
+//! unit-tested on any machine.
 //!
 //! Scope is deliberately limited to **user-level** (persistent) and
 //! **process-level** (ephemeral) variables. Nothing here ever writes to
