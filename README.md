@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/banner-dark.svg">
-    <img src="docs/images/banner-light.svg" alt="VARden: environment variables, without the fear" width="820">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/banner-dark.png">
+    <img src="docs/images/banner-light.png" alt="{VAR}den: environment variables, without the guesswork" width="820">
   </picture>
 </p>
 
@@ -12,10 +12,6 @@
 
 <p align="center">
   <a href="https://github.com/RamezCh/VARden/actions/workflows/ci.yml"><img src="https://github.com/RamezCh/VARden/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/Windows-supported-2563c9" alt="Windows">
-  <img src="https://img.shields.io/badge/macOS%20%7C%20Linux-supported-2563c9" alt="macOS and Linux">
-  <img src="https://img.shields.io/badge/admin%20rights-never%20needed-18855a" alt="No admin rights needed">
-  <img src="https://img.shields.io/badge/built%20with-Tauri%202%20%2B%20Rust-e5b34e" alt="Built with Tauri 2 and Rust">
 </p>
 
 <p align="center">
@@ -50,20 +46,23 @@ The trouble is that they're scattered and invisible:
 
 ## Why VARden?
 
-|  |  |
-|---|---|
-| 🛡️ **Safe by design** | Only *your* variables are ever changed, never system ones, so it never needs admin rights. Every change is backed up first and has an **Undo**. |
-| 🔍 **Finds what's broken** | Values that point to folders or files that don't exist are flagged, including each folder in `PATH`. |
-| ⚡ **No more "restart your terminal"** | One click pushes changes into terminals that are already open: PowerShell, Git Bash, bash, zsh and fish. |
-| 🧭 **A PATH editor you can trust** | Add, remove and reorder your folders in a list. The system part is read-only, and you review every change before it's saved. |
-| 🔐 **Secrets stay hidden** | API keys and passwords are masked on screen, can be copied without being shown, and can't be found by typing guesses into search. |
-| 🗂️ **Profiles and `.env` files** | Switch a whole set of variables per client or project in one click, and import or export `.env` files. |
+**Safe by design.** Only your own variables are ever changed, never system ones, so VARden never needs administrator rights. Every change is backed up first and can be undone.
+
+**Finds what's broken.** Values that point to folders or files that don't exist are flagged, down to the individual folder in `PATH`.
+
+**No more "restart your terminal".** One click pushes changes into terminals that are already open: PowerShell, Git Bash, bash, zsh and fish.
+
+**A PATH editor you can trust.** Add, remove and reorder your folders as a list. The system part is read-only, and you review every change before it's saved.
+
+**Secrets stay hidden.** API keys and passwords are masked on screen, can be copied without being shown, and can't be found by typing guesses into search.
+
+**Profiles and `.env` files.** Switch a whole set of variables per client or project in one step, and import or export `.env` files.
 
 ## Features
 
 ### See everything, at a glance
 
-Every variable you've set, with a status that tells you whether it works and whether your terminals have it yet.
+Every variable you've set, with a status that tells you whether it works and whether your terminals have it yet. The coloured dot in front of each name gives the status at a glance.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/variables-dark.png">
@@ -72,10 +71,19 @@ Every variable you've set, with a status that tells you whether it works and whe
 
 | Status | Meaning | What to do |
 |---|---|---|
-| 🟢 **Active & synced** | Saved, and the environment that's running already has it. | Nothing. |
-| 🟡 **Persistent only** | Saved, but terminals that were already open don't have it yet. New ones do. | Click **Sync to terminals**, or open a new terminal. |
-| 🔵 **Temporary** | Only pushed into open terminals and never saved. Handy for a quick test. | Edit it and choose **User** to keep it. |
-| 🔴 **Missing / stale** | Empty, or points to a folder or file that doesn't exist. | Fix the value, or delete it. |
+| **Active & synced** (green) | Saved, and the environment that's running already has it. | Nothing. |
+| **Persistent only** (yellow) | Saved, but terminals that were already open don't have it yet. New ones do. | Click **Sync to terminals**, or open a new terminal. |
+| **Temporary** (blue) | Only pushed into open terminals and never saved. Handy for a quick test. | Edit it and choose **User** to keep it. |
+| **Missing / stale** (red) | Empty, or points to a folder or file that doesn't exist. | Fix the value, or delete it. |
+
+### Add and edit in a side panel
+
+Adding or editing a variable opens a panel on the right, so the list stays in view. Name, value and scope read from top to bottom; long values wrap instead of scrolling sideways, and secrets stay masked until you choose to show them.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/edit-panel-dark.png">
+  <img src="docs/images/edit-panel-light.png" alt="The edit panel on the right: name, value, and the User or Temporary scope as two choices, with Delete, Cancel and Save at the bottom" width="900">
+</picture>
 
 ### Read long values, and spot the broken part
 
@@ -239,7 +247,7 @@ flowchart LR
 
 ## Quick start
 
-1. **Open VARden.** The **Variables** page lists everything you've set for your account. Anything 🔴 needs a look.
+1. **Open VARden.** The **Variables** page lists everything you've set for your account. Anything marked *Missing / stale* needs a look.
 2. **Add a variable** with **New variable** (<kbd>Ctrl</kbd>+<kbd>N</kbd>). Choose **User** to keep it, or **Temporary** to try it in open terminals only.
 3. **Set up terminal sync once.** Go to **Shells** and click **Install** next to the shells you use. Open a new terminal so it picks up the hook.
 4. **Sync.** From now on, after a change, click **Sync to terminals** and your open terminals have it at their next prompt.
@@ -251,15 +259,15 @@ How VARden compares with the tools you'd otherwise use:
 
 |  | **VARden** | Windows "Environment Variables" dialog | `setx` | Editing `.bashrc` / `.zshrc` by hand |
 |---|:---:|:---:|:---:|:---:|
-| See every variable at once | ✅ | ✅ | ❌ | ❌ |
-| Backup and undo for every change | ✅ | ❌ | ❌ | ❌ |
-| Flags values that point to missing folders | ✅ | ❌ | ❌ | ❌ |
-| Updates terminals that are already open | ✅ | ❌ | ❌ | `source` in each terminal |
-| PATH edited as a list, with a review step | ✅ | List, no review | ❌ ([cuts values at 1,024 characters](https://learn.microsoft.com/en-us/answers/questions/900933/setx-command-warning-the-data-being-saved-is-trunc)) | ❌ |
-| Secrets masked on screen | ✅ | ❌ | ❌ | ❌ |
-| Profiles per project or client | ✅ | ❌ | ❌ | ❌ |
-| `.env` import and export | ✅ | ❌ | ❌ | ❌ |
-| Works on Windows, macOS and Linux | ✅ | Windows | Windows | macOS / Linux |
+| See every variable at once | Yes | Yes | No | No |
+| Backup and undo for every change | Yes | No | No | No |
+| Flags values that point to missing folders | Yes | No | No | No |
+| Updates terminals that are already open | Yes | No | No | `source` in each terminal |
+| PATH edited as a list, with a review step | Yes | List, no review | No ([cuts values at 1,024 characters](https://learn.microsoft.com/en-us/answers/questions/900933/setx-command-warning-the-data-being-saved-is-trunc)) | No |
+| Secrets masked on screen | Yes | No | No | No |
+| Profiles per project or client | Yes | No | No | No |
+| `.env` import and export | Yes | No | No | No |
+| Works on Windows, macOS and Linux | Yes | Windows | Windows | macOS / Linux |
 | Needs admin rights | Never | For system variables | For `/M` | No |
 
 ## FAQ
@@ -305,9 +313,9 @@ VARden stores values exactly where your operating system expects them: the Windo
 </details>
 
 <details>
-<summary><b>Why is a variable marked 🔴 "Missing / stale" when it looks fine?</b></summary>
+<summary><b>Why is a variable marked "Missing / stale" when it looks fine?</b></summary>
 
-Either its value is empty, or it points to a folder or file that doesn't exist on this computer. Open the row (the ▸ arrow) to see exactly which part is missing. Common causes are an uninstalled SDK, a version number that changed after an update (`jdk-17` vs `jdk-17.0.2`), or a typo. URLs, relative paths and network shares are never checked, so they're never flagged.
+Either its value is empty, or it points to a folder or file that doesn't exist on this computer. Open the row with the arrow next to its value to see exactly which part is missing. Common causes are an uninstalled SDK, a version number that changed after an update (`jdk-17` vs `jdk-17.0.2`), or a typo. URLs, relative paths and network shares are never checked, so they're never flagged.
 </details>
 
 <details>

@@ -9,7 +9,7 @@ const OPTIONS: { value: ThemePref; label: string; icon: React.ReactNode }[] = [
 
 export function ThemeSwitch({ pref, onChange }: { pref: ThemePref; onChange: (p: ThemePref) => void }) {
   return (
-    <div className="flex items-center justify-between gap-2 px-1">
+    <div className="flex items-center justify-between gap-2 pl-2.5">
       <span className="text-xs text-muted">Theme</span>
       <div role="radiogroup" aria-label="Theme" className="flex rounded-md border border-rule bg-ink/50 p-0.5">
         {OPTIONS.map((o) => (

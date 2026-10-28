@@ -10,6 +10,7 @@ import { StatusStrip } from "./StatusStrip";
 import { Help } from "./Help";
 import { HELP } from "../lib/helpText";
 import { VariableTable } from "./VariableTable";
+import { VariablePanel, type PanelState } from "./VariablePanel";
 
 interface Props {
   vars: EnvVar[];
@@ -68,6 +69,13 @@ export function VariablesView({
   const [revealAll, setRevealAll] = useState(false);
   const [revealed, setRevealed] = useState<ReadonlySet<string>>(new Set());
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  // The side panel: adding (from "New variable") or editing one row.
+  const [openVar, setOpenVar] = useState<EnvVar | null>(null);
+  const panel: PanelState | null = creating ? { kind: "new" } : openVar ? { kind: "edit", v: openVar } : null;
+  const closePanel = () => {
+    setCreating(false);
+    setOpenVar(null);
+  };
   const [confirmBulk, setConfirmBulk] = useState(false);
 
   const isRevealed = (v: EnvVar) => revealAll || revealed.has(rowId(v));
@@ -364,12 +372,9 @@ export function VariablesView({
             return next;
           })
         }
-        creating={creating}
-        onCloseCreate={() => setCreating(false)}
         busy={busy}
-        onSet={onSet}
         onDelete={onDelete}
-        onRename={onRename}
+        onOpen={setOpenVar}
         onEditPath={onEditPath}
         caseInsensitive={caseInsensitive}
         selected={selected}
@@ -378,6 +383,19 @@ export function VariablesView({
         empty={empty}
       />
 
+      {panel && (
+        <VariablePanel
+          key={panel.kind === "edit" ? rowId(panel.v) : "new"}
+          state={panel}
+          allVars={vars}
+          caseInsensitive={caseInsensitive}
+          busy={busy}
+          onClose={closePanel}
+          onSet={onSet}
+          onRename={onRename}
+          onDelete={onDelete}
+        />
+      )}
     </div>
   );
 }

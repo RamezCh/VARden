@@ -10,13 +10,13 @@ Phases 1–3 of the original spec (backend core, dashboard, terminal sync, `.env
 
 ## Stage 2: Validation
 - [x] Rename the app to VARden, moving existing data and upgrading blocks already written to startup files.
-- [x] Flag values that point to folders or files that don't exist (PATH entries, `JAVA_HOME` and similar) as 🔴.
+- [x] Flag values that point to folders or files that don't exist (PATH entries, `JAVA_HOME` and similar) as *Missing / stale*.
 - [x] Show the expanded value next to `%VAR%` values.
 - [x] More help text for newcomers, including what happens to temporary variables when the app closes.
 
 ## Stage 3: Profiles
 - [x] Named sets of variables (for example "Client A" and "Client B"), applied as User or Temporary.
-- [x] 🔴 when a profile expects a variable that is missing or empty.
+- [x] *Missing / stale* when a profile expects a variable that is missing or empty.
 - [x] Rename the shell files in the UI to "startup files", to avoid a clash with profiles.
 - [x] Screen for custom startup-file paths on macOS/Linux.
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { EnvVar, Scope } from "../lib/api";
-import { keyError, looksSensitive, rowId, type SortKey, type SortState } from "../lib/filter";
+import { rowId, STATUS_META, type SortKey, type SortState } from "../lib/filter";
 import { Button, IconButton } from "./IconButton";
 import { CheckIcon, ChevronRightIcon, CopyIcon, EyeIcon, EyeOffIcon, PencilIcon, SortIcon, TrashIcon } from "./icons";
 import { SecretValue } from "./SecretValue";
@@ -38,12 +38,10 @@ export interface TableProps {
   onSort: (key: SortKey) => void;
   isRevealed: (v: EnvVar) => boolean;
   onToggleReveal: (v: EnvVar) => void;
-  creating: boolean;
-  onCloseCreate: () => void;
   busy: boolean;
-  onSet: (key: string, value: string, scope: Scope, existed: boolean) => Promise<boolean>;
   onDelete: (key: string, scope: Scope) => Promise<boolean>;
-  onRename: (from: string, to: string, scope: Scope) => Promise<boolean>;
+  /** Open the side panel for this variable. */
+  onOpen: (v: EnvVar) => void;
   /** PATH (user scope) opens the PATH editor instead of inline editing. */
   onEditPath: () => void;
   caseInsensitive: boolean;
@@ -78,8 +76,7 @@ function SelectAll({ rows, selected, onToggleAll }: Pick<TableProps, "rows" | "s
 }
 
 export function VariableTable(props: TableProps) {
-  const { rows, sort, onSort, creating } = props;
-  const [editing, setEditing] = useState<string | null>(null);
+  const { rows, sort, onSort } = props;
   const [confirming, setConfirming] = useState<string | null>(null);
 
   const header = (label: string, key: SortKey | null, cls: string) => {
@@ -120,10 +117,8 @@ export function VariableTable(props: TableProps) {
       </div>
 
       <div className="divide-y divide-rule">
-        {creating && <NewVariableRow {...props} />}
         {rows.map((v) => {
           const id = rowId(v);
-          if (editing === id) return <EditRow key={id} v={v} {...props} onDone={() => setEditing(null)} />;
           if (confirming === id)
             return <ConfirmDeleteRow key={id} v={v} {...props} onDone={() => setConfirming(null)} />;
           return (
@@ -134,16 +129,13 @@ export function VariableTable(props: TableProps) {
               onEdit={() => {
                 setConfirming(null);
                 if (isPathVar(v, props.caseInsensitive)) props.onEditPath();
-                else setEditing(id);
+                else props.onOpen(v);
               }}
-              onAskDelete={() => {
-                setEditing(null);
-                setConfirming(id);
-              }}
+              onAskDelete={() => setConfirming(id)}
             />
           );
         })}
-        {rows.length === 0 && !creating && <div className="px-4 py-12 text-center">{props.empty}</div>}
+        {rows.length === 0 && <div className="px-4 py-12 text-center">{props.empty}</div>}
       </div>
     </div>
   );
@@ -307,6 +299,12 @@ function ViewRow({
           checked={picked}
           onChange={() => onToggleSelect(v)}
         />
+        <span
+          className="h-2 w-2 shrink-0 rounded-full"
+          style={{ background: STATUS_META[v.status].color }}
+          title={STATUS_META[v.status].label}
+          aria-hidden
+        />
         <span className="truncate font-mono text-[0.9rem] font-medium" title={v.key}>
           {v.key}
         </span>
@@ -403,117 +401,6 @@ export function ValueInput({
   );
 }
 
-function ScopeSelect({ value, onChange, disabled }: { value: Scope; onChange: (s: Scope) => void; disabled?: boolean }) {
-  return (
-    <select
-      aria-label="Scope"
-      value={value}
-      disabled={disabled}
-      title={disabled ? "To make a saved variable temporary, delete it and add it again as Temporary." : SCOPE_HELP[value]}
-      onChange={(e) => onChange(e.target.value as Scope)}
-      className="h-8 w-full rounded-md border border-rule bg-ink px-1.5 text-sm text-fg focus:border-process focus:outline-none disabled:opacity-60"
-    >
-      <option value="user">User</option>
-      <option value="process">Temporary</option>
-    </select>
-  );
-}
-
-const enterEscape = (save: () => void, cancel: () => void) => (e: KeyboardEvent) => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    save();
-  } else if (e.key === "Escape") {
-    e.preventDefault();
-    cancel();
-  }
-};
-
-function EditRow({
-  v,
-  allVars,
-  busy,
-  onSet,
-  onRename,
-  caseInsensitive,
-  onDone,
-}: TableProps & { v: EnvVar; onDone: () => void }) {
-  const [key, setKey] = useState(v.key);
-  const [value, setValue] = useState(v.value);
-  // A temporary variable can be promoted to user scope; the reverse would
-  // silently delete saved data, so it isn't offered here.
-  const [scope, setScope] = useState<Scope>(v.scope);
-
-  const newKey = key.trim();
-  const renamed = newKey !== v.key;
-  const norm = (k: string) => (caseInsensitive ? k.toUpperCase() : k);
-  const keyProblem = !renamed
-    ? null
-    : keyError(newKey) ??
-      (caseInsensitive && norm(newKey) === norm(v.key)
-        ? "Windows ignores upper/lower case in names, so this wouldn't change anything."
-        : allVars.some((x) => x.scope === v.scope && x !== v && norm(x.key) === norm(newKey))
-          ? `${newKey} already exists.`
-          : null);
-
-  const save = async () => {
-    if (keyProblem) return;
-    if (renamed && !(await onRename(v.key, newKey, v.scope))) return;
-    if (value !== v.value || scope !== v.scope) {
-      if (!(await onSet(newKey, value, scope, scope === v.scope))) return;
-    }
-    onDone();
-  };
-  const keys = enterEscape(() => void save(), onDone);
-  return (
-    <div role="row" className={`${ROW} bg-raised/50 lg:items-start lg:py-3`}>
-      <div role="cell" className={`${C.key} col-span-2 lg:col-span-1`}>
-        <input
-          aria-label={`Name of ${v.key}`}
-          aria-invalid={Boolean(keyProblem)}
-          className={input}
-          value={key}
-          spellCheck={false}
-          autoComplete="off"
-          // Shell expressions are kept verbatim in the startup file; renaming
-          // them safely needs a person.
-          disabled={v.kind === "expression"}
-          title={
-            v.kind === "expression"
-              ? "This value is a shell expression in your startup file. Rename it there by hand."
-              : "Change the name to rename the variable"
-          }
-          onChange={(e) => setKey(e.target.value)}
-          onKeyDown={keys}
-        />
-        {keyProblem ? (
-          <p className="mt-1 text-xs text-missing">{keyProblem}</p>
-        ) : renamed ? (
-          <p className="mt-1 text-xs text-muted">Renames {v.key}, keeping its value.</p>
-        ) : null}
-      </div>
-      <div role="cell" className={C.value}>
-        <ValueInput label={`Value of ${v.key}`} value={value} onChange={setValue} sensitive={v.sensitive} onKeyDown={keys} autoFocus />
-        {scope !== v.scope && <p className="mt-1 text-xs text-muted">Saving will keep {v.key} after the app closes.</p>}
-      </div>
-      <div role="cell" className={C.scope}>
-        <ScopeSelect value={scope} onChange={setScope} disabled={v.scope === "user"} />
-      </div>
-      <div role="cell" className={C.status}>
-        <StatusPill status={v.status} />
-      </div>
-      <div role="cell" className={C.actions}>
-        <Button variant="quiet" onClick={onDone}>
-          Cancel
-        </Button>
-        <Button variant="primary" disabled={busy || Boolean(keyProblem)} onClick={() => void save()}>
-          Save
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 function ConfirmDeleteRow({ v, busy, onDelete, onDone }: TableProps & { v: EnvVar; onDone: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => ref.current?.querySelector<HTMLButtonElement>("[data-cancel]")?.focus(), []);
@@ -536,66 +423,6 @@ function ConfirmDeleteRow({ v, busy, onDelete, onDone }: TableProps & { v: EnvVa
         </Button>
         <Button variant="danger" disabled={busy} onClick={() => void remove()}>
           Delete
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function NewVariableRow({ allVars, busy, onSet, onCloseCreate }: TableProps) {
-  const [key, setKey] = useState("");
-  const [value, setValue] = useState("");
-  const [scope, setScope] = useState<Scope>("user");
-  const [touched, setTouched] = useState(false);
-
-  const trimmed = key.trim();
-  const error = keyError(trimmed);
-  const existing = allVars.find((v) => v.scope === scope && v.key.toLowerCase() === trimmed.toLowerCase());
-
-  const save = async () => {
-    setTouched(true);
-    if (error) return;
-    if (await onSet(trimmed, value, scope, Boolean(existing))) onCloseCreate();
-  };
-  const keys = enterEscape(() => void save(), onCloseCreate);
-
-  return (
-    <div role="row" className={`${ROW} bg-raised/50 lg:items-start lg:py-3`}>
-      <div role="cell" className={`${C.key} col-span-2 lg:col-span-1`}>
-        <input
-          aria-label="Name"
-          aria-invalid={touched && Boolean(error)}
-          className={input}
-          placeholder="NAME"
-          value={key}
-          spellCheck={false}
-          autoComplete="off"
-          autoFocus
-          onChange={(e) => setKey(e.target.value)}
-          onBlur={() => setTouched(true)}
-          onKeyDown={keys}
-        />
-        {touched && error ? (
-          <p className="mt-1 text-xs text-missing">{error}</p>
-        ) : existing ? (
-          <p className="mt-1 text-xs text-persistent">{existing.key} exists. Saving replaces its value.</p>
-        ) : null}
-      </div>
-      <div role="cell" className={C.value}>
-        <ValueInput label="Value" value={value} onChange={setValue} sensitive={looksSensitive(trimmed)} onKeyDown={keys} />
-      </div>
-      <div role="cell" className={C.scope}>
-        <ScopeSelect value={scope} onChange={setScope} />
-      </div>
-      <div role="cell" className={`${C.status} self-center text-xs text-muted`}>
-        {SCOPE_HELP[scope]}
-      </div>
-      <div role="cell" className={`${C.actions} order-6 col-span-2 lg:col-span-1`}>
-        <Button variant="quiet" onClick={onCloseCreate}>
-          Cancel
-        </Button>
-        <Button variant="primary" disabled={busy} onClick={() => void save()}>
-          Add
         </Button>
       </div>
     </div>

@@ -16,6 +16,7 @@ import { ProfilesView } from "./components/ProfilesView";
 import { fileName, pickEnvFile, pickExportPath, useFileDrop } from "./lib/files";
 import { useTheme } from "./lib/theme";
 import { ThemeSwitch } from "./components/ThemeSwitch";
+import { Wordmark } from "./components/Wordmark";
 import { formatShort, useEnvironment } from "./lib/useEnvironment";
 import { useToasts } from "./lib/useToasts";
 
@@ -136,14 +137,8 @@ export default function App() {
   return (
     <div className="flex h-screen min-h-0">
       <aside className="flex w-56 shrink-0 flex-col border-r border-rule bg-panel/70 px-3 pb-4 pt-5">
-        <div className="flex items-center gap-2.5 px-2.5">
-          <svg width="24" height="24" viewBox="0 0 22 22" aria-hidden>
-            <rect x="1" y="1" width="20" height="20" rx="6" fill="var(--color-raised)" stroke="var(--color-rule)" />
-            <circle cx="7" cy="14" r="2" fill="var(--color-synced)" />
-            <circle cx="11" cy="14" r="2" fill="var(--color-persistent)" />
-            <circle cx="15" cy="14" r="2" fill="var(--color-process)" />
-          </svg>
-          <span className="text-lg font-semibold leading-tight tracking-tight">VARden</span>
+        <div className="px-2.5 pb-1">
+          <Wordmark className="text-[1.35rem] leading-none" />
         </div>
 
         <nav aria-label="Sections" className="mt-6 flex flex-col gap-0.5">
@@ -170,7 +165,7 @@ export default function App() {
         </nav>
 
         <div className="mt-auto flex flex-col gap-3">
-          <div className="rounded-lg border border-rule bg-ink/50 px-3 py-2.5">
+          <div className="rounded-lg border border-rule bg-ink/50 px-2.5 py-2.5">
             <p className="flex items-center gap-1.5 text-xs text-muted">
               Saving to <Help label="Where are variables saved?">{HELP.store}</Help>
             </p>
@@ -193,7 +188,7 @@ export default function App() {
           <ThemeSwitch pref={theme.pref} onChange={theme.choose} />
           <button
             type="button"
-            className="self-start px-1 text-xs text-faint underline-offset-4 hover:text-fg hover:underline"
+            className="self-start px-2.5 text-xs text-faint underline-offset-4 hover:text-fg hover:underline"
             title="Diagnostic logs, useful when reporting a problem"
             onClick={() => api.openLogsFolder().catch((e) => push("error", `Couldn't open the log folder: ${String(e)}`))}
           >
