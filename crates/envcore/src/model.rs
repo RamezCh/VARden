@@ -25,15 +25,17 @@ pub enum Status {
     MissingStale,
 }
 
-/// How the value is stored. Only meaningful on Windows, where the registry
-/// distinguishes plain strings from strings containing `%VAR%` references.
+/// How the value is stored.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ValueKind {
     #[default]
     String,
-    /// REG_EXPAND_SZ: `%USERPROFILE%\bin` is expanded when read by Windows.
+    /// Windows REG_EXPAND_SZ: `%USERPROFILE%\bin` is expanded when read.
     ExpandString,
+    /// A shell expression in a startup file (`"$HOME/bin:$PATH"`). Only that
+    /// shell can evaluate it, so it is shown raw and never expanded here.
+    Expression,
 }
 
 /// A raw persisted entry, as read from a store.

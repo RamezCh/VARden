@@ -61,7 +61,7 @@ impl RegistryStore {
         let raw = RegValue {
             bytes: Cow::Owned(bytes),
             vtype: match kind {
-                ValueKind::String => REG_SZ,
+                ValueKind::String | ValueKind::Expression => REG_SZ,
                 ValueKind::ExpandString => REG_EXPAND_SZ,
             },
         };

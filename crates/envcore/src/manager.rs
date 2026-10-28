@@ -582,10 +582,14 @@ fn current_registry() -> Result<Vec<StoredVar>> {
 #[cfg(windows)]
 pub(crate) fn resolver(v: &StoredVar) -> Option<String> {
     use crate::model::ValueKind;
-    Some(match v.kind {
-        ValueKind::String => v.value.clone(),
-        ValueKind::ExpandString => crate::store::windows_registry::expand_env_strings(&v.value),
-    })
+    match v.kind {
+        ValueKind::String => Some(v.value.clone()),
+        ValueKind::ExpandString => {
+            Some(crate::store::windows_registry::expand_env_strings(&v.value))
+        }
+        // A shell expression: only the shell that defined it can evaluate it.
+        ValueKind::Expression => None,
+    }
 }
 
 #[cfg(not(windows))]

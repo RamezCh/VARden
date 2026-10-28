@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 export type Scope = "user" | "process";
 export type Status = "activeSynced" | "persistentOnly" | "processOnly" | "missingStale";
-export type ValueKind = "string" | "expandString";
+export type ValueKind = "string" | "expandString" | "expression";
 export type Syntax = "posix" | "fish" | "nushell" | "powerShell";
 
 export interface EnvVar {

@@ -205,6 +205,9 @@ mod tests {
 
     #[test]
     fn path_checks() {
+        // Lists use the platform's separator: ';' on Windows (where ':' is
+        // part of "C:\..."), ':' elsewhere.
+        let sep = if cfg!(windows) { ';' } else { ':' };
         let dir = tempfile::tempdir().unwrap();
         let ok = dir.path().join("bin");
         std::fs::create_dir(&ok).unwrap();
@@ -212,31 +215,31 @@ mod tests {
         let gone = dir.path().join("gone").to_string_lossy().to_string();
         let home = Some(dir.path());
 
-        let list = format!("{ok}:{gone}:relative/dir::{ok}");
+        let list = format!("{ok}{sep}{gone}{sep}relative/dir{sep}{sep}{ok}");
         assert_eq!(
-            check_paths("PATH", &list, ':', home),
+            check_paths("PATH", &list, sep, home),
             PathCheck {
                 checked: 3,
                 missing: vec![gone.clone()]
             }
         );
         assert_eq!(
-            check_paths("JAVA_HOME", &gone, ':', home).missing,
+            check_paths("JAVA_HOME", &gone, sep, home).missing,
             vec![gone.clone()]
         );
         assert_eq!(
-            check_paths("JAVA_HOME", &ok, ':', home),
+            check_paths("JAVA_HOME", &ok, sep, home),
             PathCheck {
                 checked: 1,
                 missing: vec![]
             }
         );
         assert_eq!(
-            check_paths("HOME_BIN", "~/bin", ':', home).missing,
+            check_paths("HOME_BIN", "~/bin", sep, home).missing,
             Vec::<String>::new()
         );
         assert_eq!(
-            check_paths("HOME_BIN", "~/nope", ':', home).missing,
+            check_paths("HOME_BIN", "~/nope", sep, home).missing,
             vec!["~/nope".to_string()]
         );
         // Not paths: never flagged.
@@ -247,12 +250,19 @@ mod tests {
             "1",
             "\\\\server\\share\\x",
         ] {
-            assert_eq!(check_paths("ANY", v, ':', home).checked, 0, "{v}");
+            assert_eq!(check_paths("ANY", v, sep, home).checked, 0, "{v}");
         }
         // A custom *_PATH variable holding a list is split too.
         assert_eq!(
-            check_paths("MY_TOOLS_PATH", &format!("{ok}:{gone}"), ':', home).checked,
+            check_paths("MY_TOOLS_PATH", &format!("{ok}{sep}{gone}"), sep, home).checked,
             2
+        );
+        // Windows drive paths are recognised on every platform.
+        assert_eq!(
+            check_paths("TOOLS", r"Z:\VARden\does\not\exist", ';', home)
+                .missing
+                .len(),
+            1
         );
     }
 }

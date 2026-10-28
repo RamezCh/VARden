@@ -90,7 +90,7 @@ impl PersistentStore for ShellFileStore {
             out.push(StoredVar {
                 key,
                 value: raw,
-                kind: ValueKind::ExpandString,
+                kind: ValueKind::Expression,
             });
         }
         Ok(out)

@@ -86,12 +86,12 @@ impl EnvSnapshot {
 /// `"$HOME/bin:$PATH"`), in which case only presence is compared.
 pub type Resolver<'a> = &'a dyn Fn(&StoredVar) -> Option<String>;
 
-/// Default resolver: literal values resolve to themselves, expandable ones
-/// are unknown.
+/// Default resolver: literal values resolve to themselves; anything that
+/// needs expanding is unknown.
 pub fn literal_resolver(v: &StoredVar) -> Option<String> {
     match v.kind {
         ValueKind::String => Some(v.value.clone()),
-        ValueKind::ExpandString => None,
+        ValueKind::ExpandString | ValueKind::Expression => None,
     }
 }
 
