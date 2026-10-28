@@ -249,7 +249,7 @@ Download the file for your system from the [latest release](https://github.com/R
 VARden checks for new versions when it starts (you can turn this off in **Settings**). Updates are signed, and VARden refuses any update whose signature doesn't match.
 
 > [!NOTE]
-> The installers aren't signed with a paid code-signing certificate yet, so Windows may show "Windows protected your PC" the first time. Click **More info**, then **Run anyway**.
+> The installers aren't signed with a paid code-signing certificate yet, so your system may warn you the first time. On Windows ("Windows protected your PC"), click **More info**, then **Run anyway**. On macOS, right-click VARden in Applications, choose **Open**, then **Open** again.
 
 ### Build from source
 
