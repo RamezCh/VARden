@@ -56,12 +56,41 @@ export const HELP: Record<string, ReactNode> = {
   hook: (
     <>
       <p>
-        Installing adds a short block, clearly marked, to this shell's profile: the script the shell runs when it starts. A
-        backup of the profile is saved first.
+        Installing adds a short block, clearly marked, to this shell's startup file: the script the shell runs when it
+        starts. A backup of the file is saved first.
       </p>
       <p>
         From then on, each terminal of this shell checks before every prompt whether you've clicked{" "}
         <em>Sync to terminals</em>, and applies the change if so. Remove takes the block out again.
+      </p>
+    </>
+  ),
+  profiles: (
+    <>
+      <p>
+        A profile is a named set of variables, for example the API keys and URLs of one client. Apply it to switch them
+        all at once, and turn it off to put the previous values back. A value you changed by hand in between is kept.
+      </p>
+      <p>
+        <strong>Apply</strong> saves the values as user variables. <strong>Apply temporarily</strong> only pushes them into
+        open terminals when you sync, without saving anything. One profile is active at a time.
+      </p>
+      <p>
+        Leave a value empty to mark the variable as required: while the profile is active, it shows as{" "}
+        <em>Missing</em> until it has a value.
+      </p>
+    </>
+  ),
+  startupFiles: (
+    <>
+      <p>
+        On macOS and Linux, environment variables live in the files your shell runs when it starts, such as{" "}
+        <span className="font-mono">~/.zshrc</span> or <span className="font-mono">~/.bashrc</span>. VARden writes its
+        variables into a clearly marked block in those files and leaves everything else untouched.
+      </p>
+      <p>
+        By default that is your login shell's file. Add others if you use several shells or keep these files somewhere
+        else, for example in a dotfiles folder.
       </p>
     </>
   ),

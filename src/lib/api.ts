@@ -185,3 +185,41 @@ export const syncApi = {
     invoke<MutationResult>("import_variables", { entries, scope }),
   exportEnvFile: (path: string, items: ExportItem[]) => invoke<ExportReport>("export_env_file", { path, items }),
 };
+
+// ----- Stage 3: profiles, startup files -----
+
+export interface Profile {
+  /** Empty when creating. */
+  id: string;
+  name: string;
+  /** An empty value means "expected": not written, shown as Missing until set. */
+  vars: EnvEntry[];
+}
+
+export interface ActiveProfile {
+  id: string;
+  name: string;
+  scope: Scope;
+  appliedAt: string;
+  /** Edited since it was applied. */
+  outdated: boolean;
+}
+
+export interface ProfilesView {
+  profiles: Profile[];
+  active: ActiveProfile | null;
+}
+
+export interface ProfileResult {
+  variables: EnvVar[];
+  profiles: ProfilesView;
+  backups: BackupOutcome[];
+}
+
+export const profileApi = {
+  list: () => invoke<ProfilesView>("list_profiles"),
+  save: (profile: Profile) => invoke<ProfilesView>("save_profile", { profile }),
+  remove: (id: string) => invoke<ProfilesView>("delete_profile", { id }),
+  apply: (id: string, scope: Scope) => invoke<ProfileResult>("apply_profile", { id, scope }),
+  deactivate: () => invoke<ProfileResult>("deactivate_profile"),
+};

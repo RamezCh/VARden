@@ -12,6 +12,12 @@ export async function pickEnvFile(): Promise<string | null> {
   return typeof picked === "string" ? picked : null;
 }
 
+/** Any file, e.g. a shell startup file kept in a dotfiles folder. */
+export async function pickStartupFile(): Promise<string | null> {
+  const picked = await open({ multiple: false, directory: false, title: "Choose a shell startup file" });
+  return typeof picked === "string" ? picked : null;
+}
+
 export async function pickExportPath(): Promise<string | null> {
   return save({ defaultPath: ".env", filters: FILTERS, title: "Export variables" });
 }

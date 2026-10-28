@@ -18,7 +18,11 @@ export function Modal({ open, onClose, title, description, children, footer }: P
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
-    if (open && !d.open) d.showModal();
+    if (open && !d.open) {
+      d.showModal();
+      // Start in the first field, not on a help icon or the close button.
+      d.querySelector<HTMLElement>("[data-autofocus], input:not([type=checkbox]), select, textarea")?.focus();
+    }
     if (!open && d.open) d.close();
   }, [open]);
 

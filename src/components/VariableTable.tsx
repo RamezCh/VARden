@@ -28,7 +28,7 @@ const SCOPE_HELP: Record<Scope, string> = {
   process: "Never saved. Pushed into open terminals when you sync.",
 };
 
-const input =
+export const input =
   "h-8 w-full min-w-0 rounded-md border border-rule bg-ink px-2.5 font-mono text-[0.9rem] text-fg placeholder:font-sans placeholder:text-faint focus:border-process focus:outline-none";
 
 export interface TableProps {
@@ -200,13 +200,14 @@ function ViewRow({
 }
 
 /** Value input with its own show/hide toggle, masked by default for secrets. */
-function ValueInput({
+export function ValueInput({
   value,
   onChange,
   sensitive,
   onKeyDown,
   autoFocus,
   label,
+  placeholder = "Value",
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -214,6 +215,7 @@ function ValueInput({
   onKeyDown: (e: KeyboardEvent) => void;
   autoFocus?: boolean;
   label: string;
+  placeholder?: string;
 }) {
   const [shown, setShown] = useState(!sensitive);
   useEffect(() => setShown(!sensitive), [sensitive]);
@@ -224,7 +226,7 @@ function ValueInput({
         className={input}
         type={shown ? "text" : "password"}
         value={value}
-        placeholder="Value"
+        placeholder={placeholder}
         spellCheck={false}
         autoComplete="off"
         autoFocus={autoFocus}

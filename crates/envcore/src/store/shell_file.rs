@@ -104,14 +104,15 @@ impl PersistentStore for ShellFileStore {
         )
     }
 
-    fn set_many(
+    fn update_many(
         &self,
-        entries: &[(String, String)],
+        changes: &[(String, Option<String>)],
         reason: &str,
         backups: &BackupStore,
     ) -> Result<Option<BackupOutcome>> {
-        for (key, value) in entries {
+        for (key, value) in changes {
             validate_key(key)?;
+            let Some(value) = value else { continue };
             validate_value(key, value)?;
             if self.syntax != Syntax::Nushell && value.contains(['\n', '\r']) {
                 return Err(Error::InvalidValue {
@@ -121,8 +122,13 @@ impl PersistentStore for ShellFileStore {
             }
         }
         self.modify(reason, backups, |b| {
-            for (key, value) in entries {
-                b.set(key, value);
+            for (key, value) in changes {
+                match value {
+                    Some(value) => b.set(key, value),
+                    None => {
+                        b.remove(key);
+                    }
+                }
             }
         })
     }

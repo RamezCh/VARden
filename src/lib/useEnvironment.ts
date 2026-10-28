@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
+  profileApi,
   syncApi,
   type BackupEntry,
   type BackupOutcome,
@@ -13,6 +14,10 @@ import {
   type ExportItem,
   type MutationResult,
   type PlatformInfo,
+  type Profile,
+  type ProfileResult,
+  type ProfilesView,
+  type ShellTarget,
   type Scope,
   type ShellKind,
   type TerminalSyncInfo,
@@ -52,6 +57,8 @@ export function useEnvironment(notify: Notify, openBackups: () => void) {
   const [shells, setShells] = useState<DetectedShell[]>([]);
   const [backups, setBackups] = useState<BackupEntry[]>([]);
   const [sync, setSync] = useState<TerminalSyncInfo | null>(null);
+  const [profiles, setProfiles] = useState<ProfilesView>({ profiles: [], active: null });
+  const [startupFiles, setStartupFiles] = useState<ShellTarget[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -74,13 +81,17 @@ export function useEnvironment(notify: Notify, openBackups: () => void) {
   const refresh = useCallback(async ({ quiet = false } = {}): Promise<boolean> => {
     if (!quiet) setLoading(true);
     try {
-      const [p, v, s, b, t] = await Promise.all([
+      const [p, v, s, b, t, pr, sf] = await Promise.all([
         api.platformInfo(),
         api.listVariables(),
         api.detectShells(),
         api.listBackups(),
         syncApi.terminalSync(),
+        profileApi.list(),
+        api.getShellTargets(),
       ]);
+      setProfiles(pr);
+      setStartupFiles(sf);
       const changed = JSON.stringify(v) !== JSON.stringify(varsRef.current);
       setPlatform(p);
       setVars(v);
@@ -237,6 +248,86 @@ export function useEnvironment(notify: Notify, openBackups: () => void) {
     [notify, fail],
   );
 
+  /** Profiles: saving and deleting don't touch variables; applying does. */
+  const saveProfile = useCallback(
+    async (profile: Profile): Promise<boolean> => {
+      setBusy(true);
+      try {
+        setProfiles(await profileApi.save(profile));
+        notify("success", `Saved profile ${profile.name.trim()}.`);
+        return true;
+      } catch (e) {
+        fail(e);
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [notify, fail],
+  );
+
+  const deleteProfile = useCallback(
+    async (profile: Profile): Promise<boolean> => {
+      setBusy(true);
+      try {
+        setProfiles(await profileApi.remove(profile.id));
+        notify("success", `Deleted profile ${profile.name}.`);
+        return true;
+      } catch (e) {
+        fail(e);
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [notify, fail],
+  );
+
+  const runProfile = useCallback(
+    (call: () => Promise<ProfileResult>, success: string) =>
+      mutate(async () => {
+        const r = await call();
+        setProfiles(r.profiles);
+        return { variables: r.variables, backups: r.backups };
+      }, success),
+    [mutate],
+  );
+
+  const applyProfile = useCallback(
+    (profile: Profile, scope: Scope) =>
+      runProfile(
+        () => profileApi.apply(profile.id, scope),
+        scope === "user"
+          ? `Applied ${profile.name} to your user environment.`
+          : `Applied ${profile.name} as temporary variables. Sync to push them into open terminals.`,
+      ),
+    [runProfile],
+  );
+
+  const deactivateProfile = useCallback(
+    (name: string) => runProfile(() => profileApi.deactivate(), `Turned off ${name}. Previous values are back.`),
+    [runProfile],
+  );
+
+  const saveStartupFiles = useCallback(
+    async (targets: ShellTarget[]): Promise<boolean> => {
+      setBusy(true);
+      try {
+        setStartupFiles(await api.setShellTargets(targets));
+        setVars(await api.listVariables());
+        setPlatform(await api.platformInfo());
+        notify("success", "Saved where variables are written.");
+        return true;
+      } catch (e) {
+        fail(e);
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [notify, fail],
+  );
+
   /** Delete backups; originals are always kept by the backend. */
   const deleteBackups = useCallback(
     async (ids: string[]): Promise<boolean> => {
@@ -321,6 +412,13 @@ export function useEnvironment(notify: Notify, openBackups: () => void) {
     deleteVariable,
     restoreBackup,
     deleteBackups,
+    profiles,
+    saveProfile,
+    deleteProfile,
+    applyProfile,
+    deactivateProfile,
+    startupFiles,
+    saveStartupFiles,
     importVariables,
     exportVariables,
     syncTerminals,

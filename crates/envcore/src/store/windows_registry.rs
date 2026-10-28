@@ -134,21 +134,31 @@ impl PersistentStore for RegistryStore {
         )
     }
 
-    fn set_many(
+    fn update_many(
         &self,
-        entries: &[(String, String)],
+        changes: &[(String, Option<String>)],
         reason: &str,
         backups: &BackupStore,
     ) -> Result<Option<BackupOutcome>> {
-        for (key, value) in entries {
+        for (key, value) in changes {
             validate_key(key)?;
-            validate_value(key, value)?;
+            if let Some(value) = value {
+                validate_value(key, value)?;
+            }
         }
         let current = self.list()?;
 
-        let mut writes: Vec<(String, &str, ValueKind)> = Vec::new();
-        for (key, value) in entries {
+        // (name, Some(value) to write | None to delete, kind)
+        let mut writes: Vec<(String, Option<&str>, ValueKind)> = Vec::new();
+        for (key, value) in changes {
             let existing = Self::find(&current, key);
+            let Some(value) = value else {
+                if let Some(v) = existing {
+                    writes.retain(|(n, _, _)| !n.eq_ignore_ascii_case(&v.key));
+                    writes.push((v.key.clone(), None, v.kind));
+                }
+                continue;
+            };
             // Keep REG_EXPAND_SZ if the value already was one (PATH usually is);
             // otherwise only use it when the value actually references %VARS%.
             let kind = match existing {
@@ -164,7 +174,7 @@ impl PersistentStore for RegistryStore {
                 .map(|v| v.key.clone())
                 .unwrap_or_else(|| key.clone());
             writes.retain(|(n, _, _)| !n.eq_ignore_ascii_case(&name));
-            writes.push((name, value.as_str(), kind));
+            writes.push((name, Some(value.as_str()), kind));
         }
         if writes.is_empty() {
             return Ok(None);
@@ -173,7 +183,10 @@ impl PersistentStore for RegistryStore {
         let backup = backups.backup_registry(&current, reason)?;
         let reg = Self::open_write()?;
         for (name, value, kind) in writes {
-            Self::write_value(&reg, &name, value, kind)?;
+            match value {
+                Some(value) => Self::write_value(&reg, &name, value, kind)?,
+                None => reg.delete_value(&name).map_err(reg_err)?,
+            }
         }
         broadcast_environment_change();
         Ok(Some(backup))

@@ -60,7 +60,8 @@ export function Help({ label, children }: Props) {
         }}
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
-        onFocus={() => setHover(true)}
+        // Only keyboard focus opens it (a dialog focusing it on open shouldn't).
+        onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHover(true)}
         onBlur={() => setHover(false)}
         className="inline-grid h-4 w-4 shrink-0 cursor-help place-items-center rounded-full border border-faint align-middle font-sans text-[0.65rem] font-semibold normal-case leading-none tracking-normal text-muted transition-colors hover:border-process hover:text-process aria-expanded:border-process aria-expanded:text-process"
       >

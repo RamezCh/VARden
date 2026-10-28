@@ -15,10 +15,10 @@ Phases 1–3 of the original spec (backend core, dashboard, terminal sync, `.env
 - [x] More help text for newcomers, including what happens to temporary variables when the app closes.
 
 ## Stage 3: Profiles
-- [ ] Named sets of variables (for example "Client A" and "Client B"), applied as User or Temporary.
-- [ ] 🔴 when a profile expects a variable that is missing or empty.
-- [ ] Rename the shell files in the UI to "startup files", to avoid a clash with profiles.
-- [ ] Screen for custom startup-file paths on macOS/Linux.
+- [x] Named sets of variables (for example "Client A" and "Client B"), applied as User or Temporary.
+- [x] 🔴 when a profile expects a variable that is missing or empty.
+- [x] Rename the shell files in the UI to "startup files", to avoid a clash with profiles.
+- [x] Screen for custom startup-file paths on macOS/Linux.
 
 ## Stage 4: Editing tools
 - [ ] Safe PATH editor: only your PATH is editable (the system PATH is read-only), warnings for missing folders, a preview of changes before saving.

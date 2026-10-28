@@ -22,6 +22,7 @@ crates/envcore/        Platform core: plain Rust, no Tauri, fully unit-tested
   src/transfer.rs        .env import/export
   src/paths.rs           App data folder (%LOCALAPPDATA%\VARden)
   src/watch.rs           Notices outside changes (registry notifications, file watcher)
+  src/profiles.rs        Profiles: apply as user or temporary, turn off restores previous values
 src-tauri/             Tauri app (binary `varden`): commands.rs wraps the core API
 src/                   React + Tailwind v4 frontend
   lib/api.ts             Typed wrappers for every Tauri command
@@ -92,6 +93,12 @@ See [ROADMAP.md](ROADMAP.md) for what comes next.
 - **Expanded values.** Values with `%VAR%` show what programs actually get, for example *Expands to C:\Users\you\go*.
 - **More help.** The help texts explain what happens to temporary variables when VARden closes, and what *Missing / stale* means.
 
+## Stage 3: profiles and startup files
+
+- **Profiles** are named sets of variables, for example one per client or project. **Apply** saves them as user variables; **Apply temporarily** keeps them for open terminals only (pushed by *Sync to terminals*, never saved). One profile is active at a time and switching turns the previous one off. Applying remembers each variable's previous value and **Turn off** puts it back, except for values you changed by hand in between. An entry with an empty value marks a required variable: it isn't written, and while the profile is active it shows as *Missing* until it has a value. Editing an active profile offers **Re-apply**. Profiles can be filled by hand, from current variables, or from a `.env` file. They are stored in `profiles.json` in the app folder; like the registry and startup files, values are plain text.
+- **Startup files.** The shell files VARden writes to are called *startup files*, so "profile" only means variable sets. On macOS and Linux, *Shells → Where variables are saved* lets you add or remove startup files (for example one in a dotfiles folder). The choice is saved in `settings.json` and survives restarts, and newly chosen files are watched for outside changes right away.
+- **Safer migration.** Moving backups from an older folder no longer drops a backup whose id (a millisecond timestamp) collides with an existing one; it gets a fresh id instead.
+
 ## Renamed to VARden
 
 Earlier builds were called *Environment Manager*. On first start, VARden moves their data (backups including originals, sync state, hook scripts) from `%LOCALAPPDATA%\EnvManager` into `%LOCALAPPDATA%\VARden` and removes the old folder. Blocks in startup files written with the old `ENVMANAGER` markers are still recognised and are rewritten with `VARDEN` markers on the next change. Installed terminal-sync hooks are updated to the new location right away, with a backup first.
@@ -104,4 +111,4 @@ Earlier builds were called *Environment Manager*. On first start, VARden moves t
 
 ## Tauri commands
 
-`get_platform_info`, `list_variables`, `set_variable`, `delete_variable`, `detect_shells`, `get_shell_targets`, `set_shell_targets`, `list_backups`, `preview_restore`, `restore_backup`, `delete_backups`, `get_terminal_sync`, `install_terminal_hook`, `remove_terminal_hook`, `sync_terminals`, `read_env_file`, `import_variables`, `export_env_file`, `open_logs_folder`. Each mutation returns the refreshed variable list plus the backups it created.
+`get_platform_info`, `list_variables`, `set_variable`, `delete_variable`, `detect_shells`, `get_shell_targets`, `set_shell_targets`, `list_backups`, `preview_restore`, `restore_backup`, `delete_backups`, `get_terminal_sync`, `install_terminal_hook`, `remove_terminal_hook`, `sync_terminals`, `read_env_file`, `import_variables`, `export_env_file`, `open_logs_folder`, `list_profiles`, `save_profile`, `delete_profile`, `apply_profile`, `deactivate_profile`. Each mutation returns the refreshed variable list plus the backups it created.

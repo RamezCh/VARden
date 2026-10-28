@@ -31,6 +31,10 @@ pub enum Error {
     #[error("{0} is not supported on this platform")]
     Unsupported(&'static str),
 
+    /// An action that isn't allowed right now; the message says why.
+    #[error("{0}")]
+    Refused(String),
+
     #[error("serialization error: {0}")]
     Serde(#[from] serde_json::Error),
 }

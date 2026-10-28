@@ -9,12 +9,14 @@ import { HELP } from "./lib/helpText";
 import { ShellsView } from "./components/ShellsView";
 import { Toasts } from "./components/Toasts";
 import { VariablesView } from "./components/VariablesView";
-import { api, syncApi, type EnvVar, type PlatformInfo } from "./lib/api";
+import { api, syncApi, type EnvVar, type PlatformInfo, type Profile } from "./lib/api";
+import { ProfileEditor } from "./components/ProfileEditor";
+import { ProfilesView } from "./components/ProfilesView";
 import { pickEnvFile, pickExportPath, useFileDrop } from "./lib/files";
 import { formatShort, useEnvironment } from "./lib/useEnvironment";
 import { useToasts } from "./lib/useToasts";
 
-type View = "variables" | "shells" | "backups";
+type View = "variables" | "profiles" | "shells" | "backups";
 
 function storeDescription(p: PlatformInfo | null): string {
   if (!p) return "";
@@ -37,6 +39,7 @@ export default function App() {
   // .env import: null = closed, "picking" = modal open without a file yet.
   const [importing, setImporting] = useState<ImportSource | "picking" | null>(null);
   const [exporting, setExporting] = useState<EnvVar[] | null>(null);
+  const [editingProfile, setEditingProfile] = useState<Profile | "new" | null>(null);
   const [dropHover, setDropHover] = useState(false);
 
   const loadEnvFile = useCallback(
@@ -83,6 +86,7 @@ export default function App() {
 
   const nav: { id: View; label: string; count: number }[] = [
     { id: "variables", label: "Variables", count: env.vars.length },
+    { id: "profiles", label: "Profiles", count: env.profiles.profiles.length },
     { id: "shells", label: "Shells", count: env.shells.length },
     { id: "backups", label: "Backups", count: env.backups.length },
   ];
@@ -165,6 +169,19 @@ export default function App() {
               hooksInstalled={hooksInstalled}
               onSync={() => void env.syncTerminals()}
               onSetUpSync={() => setView("shells")}
+              activeProfile={env.profiles.active}
+              onOpenProfiles={() => setView("profiles")}
+            />
+          )}
+          {view === "profiles" && (
+            <ProfilesView
+              data={env.profiles}
+              busy={env.busy}
+              onNew={() => setEditingProfile("new")}
+              onEdit={setEditingProfile}
+              onDelete={env.deleteProfile}
+              onApply={(p, scope) => void env.applyProfile(p, scope)}
+              onTurnOff={(name) => void env.deactivateProfile(name)}
             />
           )}
           {view === "shells" && (
@@ -174,6 +191,9 @@ export default function App() {
               sync={env.sync}
               busy={env.busy}
               onSetHook={(kind, name, install) => void env.setHook(kind, name, install)}
+              startupFiles={env.startupFiles}
+              onSaveStartupFiles={env.saveStartupFiles}
+              onError={(m) => push("error", m)}
             />
           )}
           {view === "backups" && (
@@ -187,6 +207,18 @@ export default function App() {
           )}
         </div>
       </main>
+
+      {editingProfile && (
+        <ProfileEditor
+          profile={editingProfile === "new" ? null : editingProfile}
+          vars={env.vars}
+          caseInsensitive={env.platform?.os === "windows"}
+          busy={env.busy}
+          onClose={() => setEditingProfile(null)}
+          onSave={env.saveProfile}
+          onError={(m) => push("error", m)}
+        />
+      )}
 
       {importing && (
         <ImportModal

@@ -37,6 +37,15 @@ pub struct PlatformInfo {
     pub configurable_targets: bool,
 }
 
+/// App settings saved in `settings.json`.
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Settings {
+    /// Startup files chosen on macOS/Linux (`None`: the login shell's).
+    #[serde(default)]
+    startup_files: Option<Vec<ShellTarget>>,
+}
+
 /// One variable that a restore would change.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -71,6 +80,10 @@ pub struct EnvManager {
     stores: Mutex<Vec<Arc<dyn PersistentStore>>>,
     pub(crate) sync_dir: PathBuf,
     pub(crate) hooks_dir: PathBuf,
+    /// Saved profiles and which one is active.
+    pub(crate) profiles_path: PathBuf,
+    /// App settings (startup files chosen on macOS/Linux).
+    pub(crate) settings_path: PathBuf,
     /// Serialises every write so two commands never edit a file at once.
     pub(crate) write_lock: Mutex<()>,
     /// When the app itself last finished writing (to tell its own changes
@@ -98,12 +111,45 @@ pub(crate) fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 impl EnvManager {
     /// Production setup: registry on Windows, the login shell's rc file elsewhere.
     pub fn new(backup_dir: impl Into<PathBuf>) -> Self {
-        Self::with_stores(
+        let manager = Self::with_stores(
             BackupStore::new(backup_dir),
             EnvSnapshot::capture(),
             default_stores(),
         )
-        .with_dirs(paths::sync_dir(), paths::hooks_dir())
+        .with_dirs(paths::sync_dir(), paths::hooks_dir());
+        manager.restore_saved_startup_files();
+        manager
+    }
+
+    fn load_settings(&self) -> Settings {
+        std::fs::read(&self.settings_path)
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default()
+    }
+
+    /// Use the startup files the user chose earlier (macOS/Linux), if any.
+    pub fn restore_saved_startup_files(&self) {
+        if cfg!(windows) {
+            return;
+        }
+        if let Some(files) = self.load_settings().startup_files.filter(|f| !f.is_empty()) {
+            self.replace_targets(files);
+        }
+    }
+
+    fn replace_targets(&self, targets: Vec<ShellTarget>) {
+        let mut stores: Vec<Arc<dyn PersistentStore>> = Vec::new();
+        for t in targets {
+            let syntax = t.syntax.unwrap_or_else(|| shells::syntax_for_path(&t.path));
+            if !stores.iter().any(
+                |s| matches!(s.info(), StoreInfo::ShellFile { ref path, .. } if *path == t.path),
+            ) {
+                stores.push(Arc::new(ShellFileStore::new(t.path, syntax)));
+            }
+        }
+        let _guard = self.begin_write();
+        *lock(&self.stores) = stores;
     }
 
     /// Where sync files and hook scripts go (tests point these at temp dirs).
@@ -133,6 +179,8 @@ impl EnvManager {
             live: Mutex::new(live),
             sync_dir: base.join("sync"),
             hooks_dir: base.join("shell"),
+            profiles_path: base.join("profiles.json"),
+            settings_path: base.join("settings.json"),
             overlay: Mutex::new(BTreeMap::new()),
             stores: Mutex::new(stores),
             write_lock: Mutex::new(()),
@@ -206,6 +254,10 @@ impl EnvManager {
     }
 
     pub fn list(&self, tracked: &[String]) -> Result<Vec<EnvVarView>> {
+        // Variables the active profile expects show up even when missing.
+        let mut tracked = tracked.to_vec();
+        tracked.extend(self.active_profile_keys());
+        let tracked = &tracked[..];
         let persistent = self.persistent()?;
         let overlay = lock(&self.overlay).clone();
         let live = lock(&self.live);
@@ -256,30 +308,81 @@ impl EnvManager {
         if entries.is_empty() {
             return Ok(Vec::new());
         }
+        let reason = match entries.len() {
+            1 => format!("Before importing {}", entries[0].0),
+            n => format!("Before importing {n} variables"),
+        };
+        let changes: Vec<(String, Option<String>)> = entries
+            .iter()
+            .map(|(k, v)| (k.clone(), Some(v.clone())))
+            .collect();
+        self.apply_changes(&changes, scope, &reason)
+    }
+
+    /// Apply sets (`Some`) and removals (`None`) in one scope with a single
+    /// backup per store. Setting a user variable drops a temporary copy of
+    /// it, like promoting does.
+    pub(crate) fn apply_changes(
+        &self,
+        changes: &[(String, Option<String>)],
+        scope: Scope,
+        reason: &str,
+    ) -> Result<Vec<BackupOutcome>> {
+        for (key, value) in changes {
+            validate_key(key)?;
+            if let Some(value) = value {
+                validate_value(key, value)?;
+            }
+        }
+        if changes.is_empty() {
+            return Ok(Vec::new());
+        }
         let _guard = self.begin_write();
         match scope {
             Scope::Process => {
-                let mut overlay = lock(&self.overlay);
-                for (k, v) in entries {
-                    overlay.insert(k.clone(), v.clone());
+                for (k, v) in changes {
+                    self.remove_overlay(k);
+                    if let Some(v) = v {
+                        lock(&self.overlay).insert(k.clone(), v.clone());
+                    }
                 }
                 Ok(Vec::new())
             }
             Scope::User => {
-                let reason = match entries.len() {
-                    1 => format!("Before importing {}", entries[0].0),
-                    n => format!("Before importing {n} variables"),
-                };
                 let mut taken = Vec::new();
                 for store in self.stores() {
-                    taken.extend(store.set_many(entries, &reason, &self.backups)?);
+                    taken.extend(store.update_many(changes, reason, &self.backups)?);
                 }
-                for (k, _) in entries {
-                    self.remove_overlay(k);
+                for (k, v) in changes {
+                    if v.is_some() {
+                        self.remove_overlay(k);
+                    }
                 }
                 Ok(taken)
             }
         }
+    }
+
+    /// The current value of `key` in `scope`, if any.
+    pub(crate) fn current_value(&self, key: &str, scope: Scope) -> Result<Option<String>> {
+        let same = |k: &str| {
+            if self.ci {
+                k.eq_ignore_ascii_case(key)
+            } else {
+                k == key
+            }
+        };
+        Ok(match scope {
+            Scope::User => self
+                .persistent()?
+                .into_iter()
+                .find(|v| same(&v.key))
+                .map(|v| v.value),
+            Scope::Process => lock(&self.overlay)
+                .iter()
+                .find(|(k, _)| same(k))
+                .map(|(_, v)| v.clone()),
+        })
     }
 
     pub fn remove(&self, key: &str, scope: Scope) -> Result<Vec<BackupOutcome>> {
@@ -336,18 +439,16 @@ impl EnvManager {
                 "choosing shell files as the user-level store on Windows",
             ));
         }
-        let mut stores: Vec<Arc<dyn PersistentStore>> = Vec::new();
-        for t in targets {
-            let syntax = t.syntax.unwrap_or_else(|| shells::syntax_for_path(&t.path));
-            if !stores.iter().any(
-                |s| matches!(s.info(), StoreInfo::ShellFile { ref path, .. } if *path == t.path),
-            ) {
-                stores.push(Arc::new(ShellFileStore::new(t.path, syntax)));
-            }
+        if targets.is_empty() {
+            return Err(Error::Refused(
+                "Keep at least one startup file, or there is nowhere to save variables.".into(),
+            ));
         }
-        let _guard = self.begin_write();
-        *lock(&self.stores) = stores;
-        Ok(())
+        self.replace_targets(targets);
+        // Remember the choice across restarts.
+        let mut settings = self.load_settings();
+        settings.startup_files = Some(self.shell_targets());
+        fsutil::write_atomic(&self.settings_path, &serde_json::to_vec_pretty(&settings)?)
     }
 
     // ----- backups -----
@@ -638,5 +739,37 @@ mod tests {
             ]
         );
         assert!(!preview.other_changes && !preview.deletes_file);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn chosen_startup_files_survive_a_restart() {
+        let (dir, m) = setup();
+        let zshrc = dir.path().join(".zshrc");
+        let fish = dir.path().join("config.fish");
+        m.set_shell_targets(vec![
+            ShellTarget {
+                path: zshrc.clone(),
+                syntax: None,
+            },
+            ShellTarget {
+                path: fish.clone(),
+                syntax: None,
+            },
+        ])
+        .unwrap();
+        assert!(m.set_shell_targets(vec![]).is_err());
+
+        // A fresh manager over the same folder picks the choice up again.
+        let again = EnvManager::with_stores(
+            BackupStore::new(dir.path().join("backups")),
+            EnvSnapshot::default(),
+            vec![],
+        );
+        again.restore_saved_startup_files();
+        let targets = again.shell_targets();
+        assert_eq!(targets.len(), 2);
+        assert_eq!(targets[1].path, fish);
+        assert_eq!(targets[1].syntax, Some(Syntax::Fish));
     }
 }

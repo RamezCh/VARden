@@ -21,6 +21,19 @@ fn migrate_legacy_data() {
     }
 }
 
+/// Refresh the dashboard when variables change outside the app.
+pub(crate) fn spawn_watcher(app: &AppHandle, paths: Vec<std::path::PathBuf>) -> watch::Watcher {
+    let handle = app.clone();
+    watch::spawn(paths, move |source| {
+        let mgr = handle.state::<EnvManager>();
+        if mgr.wrote_within(Duration::from_millis(1500)) {
+            return; // the echo of the app's own write
+        }
+        log::info!("Outside change detected ({source:?}); refreshing");
+        let _ = handle.emit(ENV_CHANGED, ());
+    })
+}
+
 /// A second launch just brings the running window to the front.
 fn focus_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -92,18 +105,9 @@ pub fn run() {
                 Err(e) => log::error!("Could not update terminal hooks: {e}"),
             }
 
-            // Refresh the dashboard when variables change outside the app.
-            let handle = app.handle().clone();
-            let watcher = watch::spawn(manager.watch_paths(), move |source| {
-                let mgr = handle.state::<EnvManager>();
-                if mgr.wrote_within(Duration::from_millis(1500)) {
-                    return; // the echo of the app's own write
-                }
-                log::info!("Outside change detected ({source:?}); refreshing");
-                let _ = handle.emit(ENV_CHANGED, ());
-            });
-
+            let paths = manager.watch_paths();
             app.manage(manager);
+            let watcher = spawn_watcher(app.handle(), paths);
             app.manage(Mutex::new(watcher));
             Ok(())
         })
@@ -127,6 +131,11 @@ pub fn run() {
             commands::import_variables,
             commands::export_env_file,
             commands::open_logs_folder,
+            commands::list_profiles,
+            commands::save_profile,
+            commands::delete_profile,
+            commands::apply_profile,
+            commands::deactivate_profile,
         ])
         .run(tauri::generate_context!())
         .expect("error while running VARden");

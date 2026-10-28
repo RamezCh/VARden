@@ -1,5 +1,5 @@
 import { useState, type RefObject } from "react";
-import type { EnvVar, Scope, Status } from "../lib/api";
+import type { ActiveProfile, EnvVar, Scope, Status } from "../lib/api";
 import { countByStatus, filterVars, rowId, sortVars, type ScopeFilter, type SortKey, type SortState } from "../lib/filter";
 import { Button } from "./IconButton";
 import { EyeIcon, EyeOffIcon, PlusIcon, SearchIcon, SyncIcon } from "./icons";
@@ -23,6 +23,8 @@ interface Props {
   hooksInstalled: number;
   onSync: () => void;
   onSetUpSync: () => void;
+  activeProfile: ActiveProfile | null;
+  onOpenProfiles: () => void;
 }
 
 const SCOPES: { value: ScopeFilter; label: string }[] = [
@@ -45,6 +47,8 @@ export function VariablesView({
   hooksInstalled,
   onSync,
   onSetUpSync,
+  activeProfile,
+  onOpenProfiles,
 }: Props) {
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<ScopeFilter>("all");
@@ -145,6 +149,19 @@ export function VariablesView({
           </Button>
         </div>
       </div>
+
+      {activeProfile && (
+        <p className="-mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
+          <span className="h-2 w-2 rounded-full bg-process" />
+          <span>
+            Profile <strong className="text-fg">{activeProfile.name}</strong> is active
+            {activeProfile.scope === "process" ? " as temporary variables" : ""}.
+          </span>
+          <button type="button" className="underline underline-offset-4 hover:text-fg" onClick={onOpenProfiles}>
+            Manage profiles
+          </button>
+        </p>
+      )}
 
       <StatusStrip counts={counts} active={statuses} onToggle={toggleStatus} onClear={() => setStatuses(new Set())} />
 

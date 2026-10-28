@@ -215,9 +215,30 @@ impl BackupStore {
             if !src.join(META).is_file() {
                 continue;
             }
-            let dst = self.root.join(dirent.file_name());
+            let mut dst = self.root.join(dirent.file_name());
             if dst.exists() {
-                continue;
+                let same = fs::read(src.join(META)).ok() == fs::read(dst.join(META)).ok()
+                    && fs::read(src.join(PAYLOAD)).ok() == fs::read(dst.join(PAYLOAD)).ok();
+                if same {
+                    let _ = fs::remove_dir_all(&src);
+                    continue;
+                }
+                // A different backup taken in the same millisecond: give it a
+                // free id instead of dropping it.
+                let base = dirent.file_name().to_string_lossy().into_owned();
+                let mut n = 1;
+                while self.root.join(format!("{base}-{n}")).exists() {
+                    n += 1;
+                }
+                let id = format!("{base}-{n}");
+                let meta_path = src.join(META);
+                let mut entry: BackupEntry = serde_json::from_slice(
+                    &fs::read(&meta_path).map_err(|e| Error::io(&meta_path, e))?,
+                )?;
+                entry.id = id.clone();
+                fs::write(&meta_path, serde_json::to_vec_pretty(&entry)?)
+                    .map_err(|e| Error::io(&meta_path, e))?;
+                dst = self.root.join(id);
             }
             if fs::rename(&src, &dst).is_err() {
                 // Different volume: copy, then remove the source.
@@ -513,5 +534,38 @@ mod tests {
             .iter()
             .any(|e| e.id == ids[0] && e.original));
         assert!(store.delete(&["../x".to_string()]).is_err());
+    }
+
+    #[test]
+    fn adopt_keeps_different_backups_with_the_same_id() {
+        let dir = tempfile::tempdir().unwrap();
+        let rc = dir.path().join(".bashrc");
+        let write = |root: &Path, id: &str, payload: &str| {
+            let d = root.join(id);
+            fs::create_dir_all(&d).unwrap();
+            let entry = BackupEntry {
+                id: id.into(),
+                created_at: Utc::now(),
+                target: BackupTarget::ShellFile {
+                    path: rc.clone(),
+                    existed: true,
+                },
+                reason: "x".into(),
+                size_bytes: payload.len() as u64,
+                original: false,
+            };
+            fs::write(d.join(META), serde_json::to_vec_pretty(&entry).unwrap()).unwrap();
+            fs::write(d.join(PAYLOAD), payload).unwrap();
+        };
+        let (old, new) = (dir.path().join("old"), dir.path().join("new"));
+        write(&new, "20261028T080000.000Z", "a");
+        write(&old, "20261028T080000.000Z", "b"); // same id, different content
+        write(&old, "20261028T090000.000Z", "c");
+        let store = BackupStore::new(&new);
+        assert_eq!(store.adopt_from(&old).unwrap(), 2);
+        let ids: Vec<String> = store.list().unwrap().into_iter().map(|e| e.id).collect();
+        assert_eq!(ids.len(), 3);
+        assert!(ids.contains(&"20261028T080000.000Z-1".to_string()));
+        assert_eq!(store.payload("20261028T080000.000Z-1").unwrap(), b"b");
     }
 }

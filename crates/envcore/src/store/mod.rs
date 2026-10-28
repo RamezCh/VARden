@@ -39,14 +39,28 @@ pub trait PersistentStore: Send + Sync {
     /// exactly this value and nothing was written.
     fn set(&self, key: &str, value: &str, backups: &BackupStore) -> Result<Option<BackupOutcome>>;
 
-    /// Create or update several variables with a single backup (used by
-    /// .env import). Every entry is validated before anything is written.
+    /// Apply several changes with a single backup: `Some(value)` sets,
+    /// `None` removes. Every entry is validated before anything is written.
+    fn update_many(
+        &self,
+        changes: &[(String, Option<String>)],
+        reason: &str,
+        backups: &BackupStore,
+    ) -> Result<Option<BackupOutcome>>;
+
+    /// Create or update several variables with a single backup (.env import).
     fn set_many(
         &self,
         entries: &[(String, String)],
         reason: &str,
         backups: &BackupStore,
-    ) -> Result<Option<BackupOutcome>>;
+    ) -> Result<Option<BackupOutcome>> {
+        let changes: Vec<(String, Option<String>)> = entries
+            .iter()
+            .map(|(k, v)| (k.clone(), Some(v.clone())))
+            .collect();
+        self.update_many(&changes, reason, backups)
+    }
 
     /// Delete `key`. Returns the backup taken, or `None` if it wasn't there.
     fn remove(&self, key: &str, backups: &BackupStore) -> Result<Option<BackupOutcome>>;

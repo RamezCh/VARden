@@ -14,7 +14,11 @@ use envcore::terminal::{SyncReport, TerminalSyncInfo};
 use envcore::transfer::{ExportItem, ExportReport};
 use envcore::Error;
 use serde::Serialize;
-use tauri::State;
+use std::sync::Mutex;
+
+use envcore::profiles::{Profile, ProfilesView};
+use envcore::watch;
+use tauri::{AppHandle, State};
 
 type CmdResult<T> = Result<T, Error>;
 
@@ -96,7 +100,9 @@ pub async fn get_shell_targets(mgr: State<'_, EnvManager>) -> CmdResult<Vec<Shel
 
 #[tauri::command]
 pub async fn set_shell_targets(
+    app: AppHandle,
     mgr: State<'_, EnvManager>,
+    watcher: State<'_, Mutex<watch::Watcher>>,
     targets: Vec<ShellTarget>,
 ) -> CmdResult<Vec<ShellTarget>> {
     let names: Vec<String> = targets
@@ -107,6 +113,9 @@ pub async fn set_shell_targets(
         format!("Set startup files: {}", names.join(", ")),
         mgr.set_shell_targets(targets),
     )?;
+    // Watch the newly chosen files for outside changes.
+    let fresh = crate::spawn_watcher(&app, mgr.watch_paths());
+    *watcher.lock().unwrap_or_else(|p| p.into_inner()) = fresh;
     Ok(mgr.shell_targets())
 }
 
@@ -282,4 +291,63 @@ pub async fn open_logs_folder() -> CmdResult<PathBuf> {
         .spawn()
         .map_err(io)?;
     Ok(dir)
+}
+
+// ----- profiles -----
+
+#[tauri::command]
+pub async fn list_profiles(mgr: State<'_, EnvManager>) -> CmdResult<ProfilesView> {
+    Ok(mgr.profiles())
+}
+
+#[tauri::command]
+pub async fn save_profile(mgr: State<'_, EnvManager>, profile: Profile) -> CmdResult<ProfilesView> {
+    let what = format!(
+        "Saved profile {} ({} variables)",
+        profile.name.trim(),
+        profile.vars.len()
+    );
+    logged(what, mgr.save_profile(profile))
+}
+
+#[tauri::command]
+pub async fn delete_profile(mgr: State<'_, EnvManager>, id: String) -> CmdResult<ProfilesView> {
+    logged(format!("Deleted profile {id}"), mgr.delete_profile(&id))
+}
+
+/// Applying or turning off a profile changes variables: return the
+/// refreshed table, the profiles, and the backups (for Undo).
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileResult {
+    pub variables: Vec<EnvVarView>,
+    pub profiles: ProfilesView,
+    pub backups: Vec<BackupOutcome>,
+}
+
+#[tauri::command]
+pub async fn apply_profile(
+    mgr: State<'_, EnvManager>,
+    id: String,
+    scope: Scope,
+) -> CmdResult<ProfileResult> {
+    let backups = logged(
+        format!("Applied profile {id} ({scope:?})"),
+        mgr.apply_profile(&id, scope),
+    )?;
+    Ok(ProfileResult {
+        variables: mgr.list(&[])?,
+        profiles: mgr.profiles(),
+        backups,
+    })
+}
+
+#[tauri::command]
+pub async fn deactivate_profile(mgr: State<'_, EnvManager>) -> CmdResult<ProfileResult> {
+    let backups = logged("Turned off the active profile", mgr.deactivate_profile())?;
+    Ok(ProfileResult {
+        variables: mgr.list(&[])?,
+        profiles: mgr.profiles(),
+        backups,
+    })
 }
