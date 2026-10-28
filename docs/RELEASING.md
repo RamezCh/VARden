@@ -60,21 +60,11 @@ The auto-updater only accepts updates signed with your private key. Create it on
 
 Without a code-signing certificate, Windows shows "Windows protected your PC" and macOS refuses to open the app until the user right-clicks it and chooses Open. Updates installed by VARden itself are always verified with the update key above, signed or not.
 
-### Windows: SignPath Foundation (free for open source)
+### Windows
 
-Microsoft's own Artifact Signing (about $10 a month) only accepts individual developers from the USA and Canada; in the EU it's for registered organizations only. The free route for an open-source project is the [SignPath Foundation](https://signpath.org/):
+Windows installers are not code-signed. Users see "Windows protected your PC" the first time and click **More info**, then **Run anyway** (the README and the website explain this). Updates installed from inside VARden don't show the warning, and they are always verified with the update key.
 
-1. **Publish the first release unsigned.** SignPath only accepts projects that are already released in the form to be signed.
-2. **Check the requirements** ([terms](https://signpath.org/terms)):
-   - an OSI-approved license (MIT: done, see `LICENSE`);
-   - a "Code signing policy" page linked from the website and downloads (done: `site/code-signing.html`);
-   - multi-factor authentication on GitHub;
-   - builds made from source by CI (done: the release workflow).
-3. **Apply** at [signpath.org](https://signpath.org/) with the repository URL.
-4. **After approval**, SignPath gives you an organization ID, a project slug and an API token. Add them as secrets (`SIGNPATH_API_TOKEN`, `SIGNPATH_ORGANIZATION_ID`), send the slugs, and the Windows job gets a signing step: the program and the installer are signed through SignPath's GitHub action before the update signature is made, so updates keep working.
-5. **Update the policy page.** Replace the "Current status" paragraph in `site/code-signing.html` with the credit SignPath asks for ("Free code signing provided by SignPath.io, certificate by SignPath Foundation").
-
-Signed installers still build reputation with SmartScreen over the first downloads, so an early warning can still appear; it fades as more people install the same signed release.
+If you ever add a certificate, sign `varden.exe` and the installer in the Windows job before tauri-action creates the update signature, so updates keep working, and update the "Current status" paragraph in `site/code-signing.html`.
 
 ### macOS: Apple Developer Program ($99 a year)
 

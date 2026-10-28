@@ -41,5 +41,5 @@ Phases 1–3 of the original spec (backend core, dashboard, terminal sync, `.env
 - [x] Copied secrets kept out of clipboard history and cleared after 30 seconds.
 - [x] Secret profile values kept in the system password store.
 - [x] Component tests for the variable panel, PATH editor and problem report.
-- [ ] First published release.
-- [ ] Code signing: SignPath Foundation for Windows (applies after the first release), Apple Developer ID for macOS (switches on when its secrets are added).
+- [x] First published release.
+- [ ] Optional: macOS signing and notarization (switches on when Apple Developer secrets are added).

@@ -382,7 +382,7 @@ VARden is built in stages. See [ROADMAP.md](ROADMAP.md) for the full list.
 - [x] Safe PATH editor, rename, bulk actions, light and dark themes
 - [x] Installers, an uninstaller that cleans up hooks, signed auto-updates, a tray icon, Settings
 - [x] MIT license, contributing guide, security policy, dependency audits
-- [ ] **Next:** the first published release, then code signing
+- [x] First published release (0.1.0)
 
 ## Developing
 
