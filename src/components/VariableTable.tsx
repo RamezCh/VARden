@@ -114,6 +114,32 @@ export function VariableTable(props: TableProps) {
   );
 }
 
+/** Paths in the value that don't exist (what makes the row 🔴). */
+function PathProblems({ v, hidden }: { v: EnvVar; hidden: boolean }) {
+  if (hidden) return <p className="mt-0.5 text-xs text-missing">Points to a path that doesn't exist.</p>;
+  if (v.checkedPaths <= 1) {
+    return (
+      <p className="mt-0.5 truncate text-xs text-missing" title={v.missingPaths[0]}>
+        Doesn't exist: <span className="font-mono">{v.missingPaths[0]}</span>
+      </p>
+    );
+  }
+  return (
+    <details className="mt-0.5 text-xs">
+      <summary className="cursor-pointer text-missing">
+        {v.missingPaths.length} of {v.checkedPaths} entries don't exist
+      </summary>
+      <ul className="mt-1 space-y-0.5 border-l border-missing/40 pl-2">
+        {v.missingPaths.map((p) => (
+          <li key={p} className="truncate font-mono text-muted" title={p}>
+            {p}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 function ScopeCell({ scope }: { scope: Scope }) {
   return (
     <span className="text-sm text-muted" title={SCOPE_HELP[scope]}>
@@ -148,6 +174,12 @@ function ViewRow({
             )}
           </p>
         )}
+        {v.expanded && !(v.sensitive && !revealed) && (
+          <p className="mt-0.5 truncate text-xs text-muted" title={v.expanded}>
+            Expands to <span className="font-mono">{v.expanded}</span>
+          </p>
+        )}
+        {v.missingPaths.length > 0 && <PathProblems v={v} hidden={v.sensitive && !revealed} />}
       </div>
       <div role="cell" className={C.scope}>
         <ScopeCell scope={v.scope} />

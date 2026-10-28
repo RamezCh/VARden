@@ -389,7 +389,10 @@ mod tests {
         .with_dirs(dir.path().join("sync"), dir.path().join("shell"));
 
         m.set("API_URL", "https://x", Scope::User).unwrap();
-        m.set("PATH", "/opt/tool/bin", Scope::User).unwrap();
+        let tool_bin = dir.path().join("tool-bin");
+        std::fs::create_dir(&tool_bin).unwrap();
+        m.set("PATH", &tool_bin.to_string_lossy(), Scope::User)
+            .unwrap();
         std::fs::write(
             &rc,
             std::fs::read_to_string(&rc)

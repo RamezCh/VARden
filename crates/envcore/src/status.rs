@@ -8,7 +8,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::model::{EnvVarView, Scope, Status, StoredVar, ValueKind};
-use crate::validate::is_sensitive;
+use crate::validate::{check_paths, is_sensitive};
 
 /// A case-aware snapshot of an environment.
 #[derive(Debug, Clone, Default)]
@@ -119,12 +119,22 @@ pub fn compute(input: &StatusInput<'_>, resolve: Resolver<'_>) -> Vec<EnvVarView
     // A saved and a temporary variable may share a name; each gets a row.
     let mut rows: BTreeMap<(String, u8), EnvVarView> = BTreeMap::new();
 
+    let home = dirs::home_dir();
+    let check =
+        |key: &str, value: &str| check_paths(key, value, input.path_separator, home.as_deref());
+
     for var in input.persistent {
         let cur = current(&var.key);
-        let status = if var.value.trim().is_empty() {
+        let resolved = resolve(var);
+        let paths = resolved
+            .as_deref()
+            .map(|r| check(&var.key, r))
+            .unwrap_or_default();
+        // Whether open terminals already have it, regardless of validity.
+        let sync_status = if var.value.trim().is_empty() {
             Status::MissingStale
         } else {
-            match (cur, resolve(var)) {
+            match (cur, resolved.clone()) {
                 (None, _) => Status::PersistentOnly,
                 (Some(_), None) => Status::ActiveSynced, // can't evaluate; present is the best we know
                 (Some(c), Some(expected))
@@ -135,6 +145,12 @@ pub fn compute(input: &StatusInput<'_>, resolve: Resolver<'_>) -> Vec<EnvVarView
                 (Some(_), Some(_)) => Status::PersistentOnly,
             }
         };
+        // A value pointing at paths that don't exist is "stale" (🔴).
+        let status = if paths.missing.is_empty() {
+            sync_status
+        } else {
+            Status::MissingStale
+        };
         rows.insert(
             (norm(&var.key), 0),
             EnvVarView {
@@ -144,7 +160,10 @@ pub fn compute(input: &StatusInput<'_>, resolve: Resolver<'_>) -> Vec<EnvVarView
                 value: var.value.clone(),
                 scope: Scope::User,
                 // Shell expressions can't be pushed, so they're never pending.
-                pending_sync: status == Status::PersistentOnly && resolve(var).is_some(),
+                pending_sync: sync_status == Status::PersistentOnly && resolved.is_some(),
+                expanded: resolved.filter(|r| *r != var.value),
+                checked_paths: paths.checked,
+                missing_paths: paths.missing,
                 status,
                 kind: var.kind,
             },
@@ -152,6 +171,7 @@ pub fn compute(input: &StatusInput<'_>, resolve: Resolver<'_>) -> Vec<EnvVarView
     }
 
     for (key, value) in input.overlay {
+        let paths = check(key, value);
         rows.insert(
             (norm(key), 1),
             EnvVarView {
@@ -159,7 +179,7 @@ pub fn compute(input: &StatusInput<'_>, resolve: Resolver<'_>) -> Vec<EnvVarView
                 value: value.clone(),
                 live_value: None,
                 scope: Scope::Process,
-                status: if value.is_empty() {
+                status: if value.is_empty() || !paths.missing.is_empty() {
                     Status::MissingStale
                 } else {
                     Status::ProcessOnly
@@ -168,6 +188,9 @@ pub fn compute(input: &StatusInput<'_>, resolve: Resolver<'_>) -> Vec<EnvVarView
                 sensitive: is_sensitive(key, value),
                 // Open terminals get it at the next sync.
                 pending_sync: current(key) != Some(value.as_str()),
+                expanded: None,
+                checked_paths: paths.checked,
+                missing_paths: paths.missing,
             },
         );
     }
@@ -190,6 +213,9 @@ pub fn compute(input: &StatusInput<'_>, resolve: Resolver<'_>) -> Vec<EnvVarView
                 kind: ValueKind::String,
                 sensitive: is_sensitive(key, cur.unwrap_or_default()),
                 pending_sync: false,
+                expanded: None,
+                checked_paths: 0,
+                missing_paths: Vec::new(),
             }
         });
     }
@@ -322,6 +348,33 @@ mod tests {
             &[("PATH", r"C:\Windows;c:\users\me\bin;C:\Tools")],
             true,
         );
-        assert_eq!(status_of(&rows, "Path"), Status::ActiveSynced);
+        // These made-up folders don't exist on the test machine, so the row
+        // is 🔴; what matters here is that terminals count as up to date.
+        let path = rows.iter().find(|r| r.key == "Path").unwrap();
+        assert!(!path.pending_sync);
+        assert!(
+            path.live_value.is_some(),
+            "process PATH also has system entries"
+        );
+    }
+
+    #[test]
+    fn broken_paths_are_stale_but_sync_state_is_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        let gone = dir.path().join("gone").to_string_lossy().to_string();
+        let real = dir.path().to_string_lossy().to_string();
+        let rows = run(
+            &[var("JAVA_HOME", &gone), var("TOOLS", &real)],
+            &[("TEMP_DIR", gone.as_str())],
+            &[("JAVA_HOME", gone.as_str())],
+            false,
+        );
+        let get = |k: &str| rows.iter().find(|r| r.key == k).unwrap();
+        assert_eq!(get("JAVA_HOME").status, Status::MissingStale);
+        assert_eq!(get("JAVA_HOME").missing_paths, vec![gone.clone()]);
+        assert!(!get("JAVA_HOME").pending_sync, "terminals already have it");
+        assert_eq!(get("TOOLS").checked_paths, 1);
+        assert!(get("TOOLS").missing_paths.is_empty());
+        assert_eq!(get("TEMP_DIR").status, Status::MissingStale);
     }
 }

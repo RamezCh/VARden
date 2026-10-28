@@ -17,6 +17,12 @@ export interface EnvVar {
   sensitive: boolean;
   /** Sync to terminals would change what open terminals have for this row. */
   pendingSync: boolean;
+  /** The value as programs see it, when different (Windows %VAR%). */
+  expanded: string | null;
+  /** How many paths in the value were checked (0: not a path). */
+  checkedPaths: number;
+  /** Paths that don't exist; non-empty makes the status Missing / stale. */
+  missingPaths: string[];
 }
 
 export type StoreInfo =

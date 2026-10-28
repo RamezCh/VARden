@@ -11,6 +11,9 @@ const v = (key: string, over: Partial<EnvVar> = {}): EnvVar => ({
   kind: "string",
   sensitive: false,
   pendingSync: false,
+  expanded: null,
+  checkedPaths: 0,
+  missingPaths: [],
   ...over,
 });
 

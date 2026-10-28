@@ -16,12 +16,12 @@ export const STATUS_META: Record<Status, { label: string; help: string; color: s
   },
   processOnly: {
     label: "Temporary",
-    help: "Never saved. Pushed into open terminals when you sync.",
+    help: "Never saved. Pushed into open terminals when you sync; removed from them at the first sync after VARden restarts.",
     color: "var(--color-process)",
   },
   missingStale: {
     label: "Missing / stale",
-    help: "Expected but empty or missing.",
+    help: "Empty, or points to files or folders that don't exist.",
     color: "var(--color-missing)",
   },
 };

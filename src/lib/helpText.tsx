@@ -13,6 +13,10 @@ export const HELP: Record<string, ReactNode> = {
         <strong>Temporary</strong> variables are never saved. They're pushed into terminals that are already open when you
         sync, and disappear when those terminals close. New terminals and other programs don't get them.
       </p>
+      <p>
+        If you close VARden, temporary variables are forgotten, but terminals keep them until your next sync, which removes
+        them.
+      </p>
     </>
   ),
   status: (

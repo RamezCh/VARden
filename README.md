@@ -86,6 +86,12 @@ npm run tauri build      # installer in target/release/bundle
 
 See [ROADMAP.md](ROADMAP.md) for what comes next.
 
+## Stage 2: validation
+
+- **Broken paths are 🔴.** Path lists (PATH, PYTHONPATH, CLASSPATH, PSModulePath and similar, plus any `*_PATH` variable holding a list) are checked entry by entry, and a value that is a single absolute path (`JAVA_HOME`, `GOROOT`) is checked as a whole, after expanding `%VAR%` or `~`. Missing entries are listed under the value, and the status becomes *Missing / stale*. The row keeps tracking whether open terminals are up to date. URLs, relative paths and shell expressions are never checked, and neither are network paths (`\\server\share`), because an unreachable share can stall a check for seconds.
+- **Expanded values.** Values with `%VAR%` show what programs actually get, for example *Expands to C:\Users\you\go*.
+- **More help.** The help texts explain what happens to temporary variables when VARden closes, and what *Missing / stale* means.
+
 ## Renamed to VARden
 
 Earlier builds were called *Environment Manager*. On first start, VARden moves their data (backups including originals, sync state, hook scripts) from `%LOCALAPPDATA%\EnvManager` into `%LOCALAPPDATA%\VARden` and removes the old folder. Blocks in startup files written with the old `ENVMANAGER` markers are still recognised and are rewritten with `VARDEN` markers on the next change. Installed terminal-sync hooks are updated to the new location right away, with a backup first.

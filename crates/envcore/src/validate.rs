@@ -79,6 +79,82 @@ fn has_url_credentials(value: &str) -> bool {
     }
 }
 
+/// Variables whose value is a list of paths, joined by the platform separator.
+const PATH_LISTS: &[&str] = &[
+    "PATH",
+    "PYTHONPATH",
+    "CLASSPATH",
+    "PSMODULEPATH",
+    "LD_LIBRARY_PATH",
+    "DYLD_LIBRARY_PATH",
+    "DYLD_FRAMEWORK_PATH",
+    "MANPATH",
+    "INFOPATH",
+    "PKG_CONFIG_PATH",
+    "NODE_PATH",
+    "PERL5LIB",
+    "GOPATH",
+    "CMAKE_PREFIX_PATH",
+];
+
+/// The result of checking a value for paths that don't exist.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PathCheck {
+    /// How many paths were checked (0: the value isn't a path).
+    pub checked: usize,
+    pub missing: Vec<String>,
+}
+
+fn is_absolute_path(p: &str) -> bool {
+    let b = p.as_bytes();
+    let windows_drive = b.len() >= 3
+        && b[0].is_ascii_alphabetic()
+        && b[1] == b':'
+        && (b[2] == b'\\' || b[2] == b'/');
+    windows_drive || p.starts_with('/') || p.starts_with("~/") || p == "~"
+}
+
+/// Network paths can take seconds to time out when unreachable; skip them.
+fn is_network_path(p: &str) -> bool {
+    p.starts_with("\\\\") || p.starts_with("//")
+}
+
+/// Check `value` (already expanded) for paths that don't exist. Path lists
+/// are checked entry by entry; other values only when the whole value is an
+/// absolute path. URLs, relative paths and network paths are never checked.
+pub fn check_paths(key: &str, value: &str, sep: char, home: Option<&std::path::Path>) -> PathCheck {
+    let upper = key.to_ascii_uppercase();
+    let value = value.trim();
+    if value.is_empty() || value.contains("://") || value.contains('\n') {
+        return PathCheck::default();
+    }
+    let is_list =
+        PATH_LISTS.contains(&upper.as_str()) || (upper.ends_with("PATH") && value.contains(sep));
+    let entries: Vec<&str> = if is_list {
+        value.split(sep).collect()
+    } else {
+        vec![value]
+    };
+
+    let mut check = PathCheck::default();
+    for raw in entries {
+        let entry = raw.trim().trim_matches('"');
+        if entry.is_empty() || !is_absolute_path(entry) || is_network_path(entry) {
+            continue;
+        }
+        let path = match (entry.strip_prefix('~'), home) {
+            (Some(rest), Some(h)) => h.join(rest.trim_start_matches(['/', '\\'])),
+            (Some(_), None) => continue,
+            (None, _) => std::path::PathBuf::from(entry),
+        };
+        check.checked += 1;
+        if !path.exists() {
+            check.missing.push(entry.to_string());
+        }
+    }
+    check
+}
+
 /// `true` if `value` contains something like `%USERPROFILE%`.
 pub fn references_variables(value: &str) -> bool {
     let mut parts = value.split('%');
@@ -125,5 +201,58 @@ mod tests {
         assert!(!references_variables("50%"));
         assert!(!references_variables("100%%"));
         assert!(!references_variables("plain"));
+    }
+
+    #[test]
+    fn path_checks() {
+        let dir = tempfile::tempdir().unwrap();
+        let ok = dir.path().join("bin");
+        std::fs::create_dir(&ok).unwrap();
+        let ok = ok.to_string_lossy().to_string();
+        let gone = dir.path().join("gone").to_string_lossy().to_string();
+        let home = Some(dir.path());
+
+        let list = format!("{ok}:{gone}:relative/dir::{ok}");
+        assert_eq!(
+            check_paths("PATH", &list, ':', home),
+            PathCheck {
+                checked: 3,
+                missing: vec![gone.clone()]
+            }
+        );
+        assert_eq!(
+            check_paths("JAVA_HOME", &gone, ':', home).missing,
+            vec![gone.clone()]
+        );
+        assert_eq!(
+            check_paths("JAVA_HOME", &ok, ':', home),
+            PathCheck {
+                checked: 1,
+                missing: vec![]
+            }
+        );
+        assert_eq!(
+            check_paths("HOME_BIN", "~/bin", ':', home).missing,
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            check_paths("HOME_BIN", "~/nope", ':', home).missing,
+            vec!["~/nope".to_string()]
+        );
+        // Not paths: never flagged.
+        for v in [
+            "postgres://u:p@h/db",
+            "code --wait",
+            "relative/dir",
+            "1",
+            "\\\\server\\share\\x",
+        ] {
+            assert_eq!(check_paths("ANY", v, ':', home).checked, 0, "{v}");
+        }
+        // A custom *_PATH variable holding a list is split too.
+        assert_eq!(
+            check_paths("MY_TOOLS_PATH", &format!("{ok}:{gone}"), ':', home).checked,
+            2
+        );
     }
 }

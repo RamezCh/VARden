@@ -62,4 +62,10 @@ pub struct EnvVarView {
     pub sensitive: bool,
     /// "Sync to terminals" would change what open terminals have for this row.
     pub pending_sync: bool,
+    /// The value as programs see it, when it differs (Windows `%VAR%`).
+    pub expanded: Option<String>,
+    /// How many paths in the value were checked (0: not a path).
+    pub checked_paths: usize,
+    /// Paths in the value that don't exist; non-empty makes the status 🔴.
+    pub missing_paths: Vec<String>,
 }
