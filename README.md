@@ -253,7 +253,7 @@ VARden checks for new versions when it starts (you can turn this off in **Settin
 
 ### Build from source
 
-1. Install [Rust](https://rustup.rs) and [Node.js 20+](https://nodejs.org). On Windows you also need the [Visual Studio C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) ("Desktop development with C++"). On Linux you need the [Tauri system packages](https://tauri.app/start/prerequisites/#linux).
+1. Install [Rust](https://rustup.rs) and [Node.js 26](https://nodejs.org) (24 also works). On Windows you also need the [Visual Studio C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) ("Desktop development with C++"). On Linux you need the [Tauri system packages](https://tauri.app/start/prerequisites/#linux).
 2. Build and run:
 
    ```bash
