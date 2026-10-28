@@ -13,6 +13,7 @@ mod fsutil;
 pub mod managed_block;
 pub mod manager;
 pub mod model;
+pub mod paths;
 pub mod shells;
 pub mod status;
 pub mod store;

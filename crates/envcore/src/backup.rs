@@ -189,6 +189,41 @@ impl BackupStore {
         Ok(None)
     }
 
+    /// Move every backup from an older backup folder into this store.
+    /// Entries already present here are left as they are. Returns how many
+    /// were moved; errors if any could not be, so the caller keeps the old
+    /// folder in that case.
+    pub fn adopt_from(&self, old_root: &Path) -> Result<usize> {
+        let rd = match fs::read_dir(old_root) {
+            Ok(rd) => rd,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+            Err(e) => return Err(Error::io(old_root, e)),
+        };
+        fs::create_dir_all(&self.root).map_err(|e| Error::io(&self.root, e))?;
+        let mut moved = 0;
+        for dirent in rd.flatten() {
+            let src = dirent.path();
+            if !src.join(META).is_file() {
+                continue;
+            }
+            let dst = self.root.join(dirent.file_name());
+            if dst.exists() {
+                continue;
+            }
+            if fs::rename(&src, &dst).is_err() {
+                // Different volume: copy, then remove the source.
+                fs::create_dir(&dst).map_err(|e| Error::io(&dst, e))?;
+                for name in [PAYLOAD, META] {
+                    fs::copy(src.join(name), dst.join(name))
+                        .map_err(|e| Error::io(src.join(name), e))?;
+                }
+                let _ = fs::remove_dir_all(&src);
+            }
+            moved += 1;
+        }
+        Ok(moved)
+    }
+
     /// All complete backups, newest first.
     pub fn list(&self) -> Result<Vec<BackupEntry>> {
         let rd = match fs::read_dir(&self.root) {
@@ -397,5 +432,24 @@ mod tests {
         fs::write(&rc, "").unwrap();
         store.backup_file(&rc, "empty").unwrap();
         assert_eq!(store.list().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn adopts_backups_from_old_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let old = BackupStore::new(dir.path().join("old"));
+        let rc = dir.path().join(".bashrc");
+        fs::write(&rc, "v1").unwrap();
+        let original = old.backup_file(&rc, "first").unwrap();
+        fs::write(&rc, "v2").unwrap();
+        old.backup_file(&rc, "second").unwrap();
+
+        let new = BackupStore::new(dir.path().join("new"));
+        assert_eq!(new.adopt_from(old.root()).unwrap(), 2);
+        let listed = new.list().unwrap();
+        assert_eq!(listed.len(), 2);
+        assert!(listed.iter().any(|e| e.id == original.id && e.original));
+        assert!(old.list().unwrap().is_empty());
+        assert_eq!(new.adopt_from(&dir.path().join("missing")).unwrap(), 0);
     }
 }
