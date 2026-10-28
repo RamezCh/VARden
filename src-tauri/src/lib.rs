@@ -1,3 +1,4 @@
+mod clipboard;
 mod commands;
 mod tray;
 
@@ -216,6 +217,7 @@ pub fn run() {
 
             let paths = manager.watch_paths();
             app.manage(manager);
+            app.manage(std::sync::Arc::new(clipboard::Clipboard::default()));
             let watcher = spawn_watcher(app.handle(), paths);
             app.manage(Mutex::new(watcher));
 
@@ -268,6 +270,7 @@ pub fn run() {
             commands::get_autostart,
             commands::set_autostart,
             commands::prepare_report,
+            commands::copy_text,
             commands::save_report,
         ])
         .build(tauri::generate_context!())

@@ -56,11 +56,7 @@ pub struct PathInfo {
 }
 
 fn sep() -> char {
-    if cfg!(windows) {
-        ';'
-    } else {
-        ':'
-    }
+    if cfg!(windows) { ';' } else { ':' }
 }
 
 // ---------- parsing ----------

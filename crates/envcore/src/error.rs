@@ -16,13 +16,17 @@ pub enum Error {
     #[error("registry error: {0}")]
     Registry(String),
 
-    #[error("invalid variable name {0:?}: use letters, digits and underscores, not starting with a digit")]
+    #[error(
+        "invalid variable name {0:?}: use letters, digits and underscores, not starting with a digit"
+    )]
     InvalidKey(String),
 
     #[error("invalid value for {key}: {reason}")]
     InvalidValue { key: String, reason: String },
 
-    #[error("the managed block in {path} is malformed ({reason}); fix it by hand or restore a backup before editing")]
+    #[error(
+        "the managed block in {path} is malformed ({reason}); fix it by hand or restore a backup before editing"
+    )]
     MalformedBlock { path: PathBuf, reason: String },
 
     #[error("backup {0} not found")]

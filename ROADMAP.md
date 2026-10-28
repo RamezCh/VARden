@@ -36,4 +36,10 @@ Phases 1–3 of the original spec (backend core, dashboard, terminal sync, `.env
 ## Stage 6: Launch
 - [x] README with GIF and screenshots, comparison table, FAQ.
 - [x] Release workflow that builds installers for every platform into a draft release.
-- [ ] License, contributing guide, first published release.
+- [x] MIT license, contributing guide, security policy, code of conduct.
+- [x] Dependency audits in CI (`cargo audit`, `npm audit`) and weekly Dependabot updates.
+- [x] Copied secrets kept out of clipboard history and cleared after 30 seconds.
+- [x] Secret profile values kept in the system password store.
+- [x] Component tests for the variable panel, PATH editor and problem report.
+- [ ] First published release.
+- [ ] Code signing: SignPath Foundation for Windows (applies after the first release), Apple Developer ID for macOS (switches on when its secrets are added).

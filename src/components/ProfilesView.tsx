@@ -15,11 +15,13 @@ interface Props {
   onDelete: (p: Profile) => Promise<boolean>;
   onApply: (p: Profile, scope: Scope) => void;
   onTurnOff: (name: string) => void;
+  /** Where secret values are kept, e.g. "Windows Credential Manager". */
+  secretStorage?: string;
 }
 
 const scopeWord = (s: Scope) => (s === "user" ? "user variables" : "temporary variables");
 
-export function ProfilesView({ data, busy, onNew, onEdit, onDelete, onApply, onTurnOff }: Props) {
+export function ProfilesView({ data, busy, onNew, onEdit, onDelete, onApply, onTurnOff, secretStorage }: Props) {
   const [confirming, setConfirming] = useState<string | null>(null);
   const { profiles, active } = data;
 
@@ -163,6 +165,12 @@ export function ProfilesView({ data, busy, onNew, onEdit, onDelete, onApply, onT
             );
           })}
         </ul>
+      )}
+
+      {secretStorage && secretStorage !== "the profiles file" && (
+        <p className="text-xs text-faint">
+          Keys, tokens and passwords in profiles are kept in {secretStorage}, not in VARden's own files.
+        </p>
       )}
     </div>
   );

@@ -267,3 +267,16 @@ td.y { color: var(--synced); font-weight: 600; }
   .two-col, .features, .platforms { grid-template-columns: 1fr; }
   .term-body { font-size: 0.88rem; min-height: 0; }
 }
+
+/* ---------- code signing policy page ---------- */
+
+.policy { max-width: 46rem; padding-block: clamp(2.5rem, 6vw, 4.5rem) 0; }
+.policy h1 { font-size: clamp(2rem, 1.4rem + 2vw, 2.8rem); margin-bottom: 2rem; }
+.policy section + section { margin-top: 2.5rem; }
+.policy h2 { font-size: 1.35rem; margin-bottom: 0.75rem; }
+.policy p { color: var(--muted); margin: 0 0 0.9rem; }
+.roles { margin: 0 0 0.9rem; display: grid; gap: 0.6rem; }
+.roles div { display: grid; grid-template-columns: 8rem 1fr; gap: 1rem; }
+.roles dt { font-weight: 600; }
+.roles dd { margin: 0; color: var(--muted); }
+@media (max-width: 620px) { .roles div { grid-template-columns: 1fr; gap: 0.1rem; } }

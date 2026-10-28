@@ -10,13 +10,14 @@ use serde::{Deserialize, Serialize};
 use crate::backup::{BackupEntry, BackupOutcome, BackupStore, BackupTarget, DeleteReport};
 use crate::managed_block::{self, Syntax};
 use crate::model::{EnvVarView, Scope, StoredVar};
+use crate::secret_store::{NoVault, OsKeychain, SecretVault};
 use crate::status::{self, EnvSnapshot, StatusInput};
 use crate::store::shell_file::ShellFileStore;
 use crate::store::{PersistentStore, StoreInfo};
 use crate::validate::is_sensitive;
 use crate::validate::{validate_key, validate_value};
-use crate::{fsutil, paths, shells};
 use crate::{Error, Result};
+use crate::{fsutil, paths, shells};
 
 /// A shell file the user chose as a persistence target (Unix).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -35,6 +36,8 @@ pub struct PlatformInfo {
     pub backup_dir: PathBuf,
     /// Whether the user can pick which shell files to write (Unix only).
     pub configurable_targets: bool,
+    /// Where profiles keep secret values ("Windows Credential Manager", ...).
+    pub secret_storage: &'static str,
 }
 
 /// App settings saved in `settings.json`.
@@ -112,6 +115,8 @@ pub struct EnvManager {
     pub(crate) hooks_dir: PathBuf,
     /// Saved profiles and which one is active.
     pub(crate) profiles_path: PathBuf,
+    /// Where profiles keep secret values.
+    pub(crate) vault: Arc<dyn SecretVault>,
     /// App settings (startup files chosen on macOS/Linux).
     pub(crate) settings_path: PathBuf,
     /// Serialises every write so two commands never edit a file at once.
@@ -146,8 +151,10 @@ impl EnvManager {
             EnvSnapshot::capture(),
             default_stores(),
         )
-        .with_dirs(paths::sync_dir(), paths::hooks_dir());
+        .with_dirs(paths::sync_dir(), paths::hooks_dir())
+        .with_vault(Arc::new(OsKeychain));
         manager.restore_saved_startup_files();
+        manager.secure_profile_secrets();
         manager
     }
 
@@ -193,6 +200,12 @@ impl EnvManager {
         self
     }
 
+    /// Keep secret profile values in `vault` instead of the profiles file.
+    pub fn with_vault(mut self, vault: Arc<dyn SecretVault>) -> Self {
+        self.vault = vault;
+        self
+    }
+
     pub fn with_stores(
         backups: BackupStore,
         live: EnvSnapshot,
@@ -210,6 +223,7 @@ impl EnvManager {
             sync_dir: base.join("sync"),
             hooks_dir: base.join("shell"),
             profiles_path: base.join("profiles.json"),
+            vault: Arc::new(NoVault),
             settings_path: base.join("settings.json"),
             overlay: Mutex::new(BTreeMap::new()),
             stores: Mutex::new(stores),
@@ -255,6 +269,7 @@ impl EnvManager {
             stores: lock(&self.stores).iter().map(|s| s.info()).collect(),
             backup_dir: self.backups.root().to_path_buf(),
             configurable_targets: !cfg!(windows),
+            secret_storage: self.secret_storage(),
         }
     }
 

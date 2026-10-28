@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -14,6 +15,11 @@ export default defineConfig({
     host: host || false,
     hmr: host ? { protocol: "ws", host, port: 1421 } : undefined,
     watch: { ignored: ["**/src-tauri/**", "**/crates/**", "**/target/**"] },
+  },
+  test: {
+    // Logic tests run in Node; component tests ask for jsdom in their first line.
+    environment: "node",
+    setupFiles: ["src/test/setup.ts"],
   },
   envPrefix: ["VITE_", "TAURI_ENV_*"],
   build: {

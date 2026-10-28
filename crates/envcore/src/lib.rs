@@ -18,6 +18,7 @@ pub mod model;
 pub mod path_editor;
 pub mod paths;
 pub mod profiles;
+pub mod secret_store;
 pub mod shells;
 pub mod status;
 pub mod store;

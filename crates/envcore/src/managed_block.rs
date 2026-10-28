@@ -435,7 +435,7 @@ fn posix_unquote(word: &str) -> Option<String> {
             },
             '\\' => out.push(chars.next()?),
             '$' | '`' | '*' | '?' | '[' | '~' | ';' | '&' | '|' | '<' | '>' | '(' | ')' => {
-                return None
+                return None;
             }
             c if c.is_whitespace() => {
                 // Allow a trailing comment, nothing else.
@@ -611,7 +611,9 @@ mod tests {
         assert!(out.starts_with(original));
         assert_eq!(
             out,
-            format!("{original}\n{START_MARKER}\n{NOTICE}\nexport OPENAI_API_KEY='sk-123'\n{END_MARKER}\n")
+            format!(
+                "{original}\n{START_MARKER}\n{NOTICE}\nexport OPENAI_API_KEY='sk-123'\n{END_MARKER}\n"
+            )
         );
     }
 

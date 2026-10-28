@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Code signing policy · VARden</title>
+  <meta name="description" content="How VARden's installers are built and signed, who can approve a release, and what data VARden sends.">
+  <meta name="color-scheme" content="dark light">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-inner">
+      <a class="wordmark" href="./" aria-label="VARden home">
+        <span class="brace" aria-hidden="true">{</span><span class="var" aria-hidden="true">VAR<span class="dots"><i></i><i></i><i></i></span></span><span class="brace" aria-hidden="true">}</span><span aria-hidden="true">den</span>
+      </a>
+      <nav aria-label="Page">
+        <a href="./#download">Download</a>
+        <a href="https://github.com/RamezCh/VARden">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="wrap policy">
+    <h1>Code signing policy</h1>
+
+    <section>
+      <h2>Current status</h2>
+      <p id="signing-status">
+        VARden's installers are not signed with a code-signing certificate yet, so Windows and macOS warn the first time
+        you open them. VARden will apply for free Windows code signing from the SignPath Foundation, which signs
+        open-source projects, once the first release is out. This page will name the certificate's provider when signing
+        starts.
+      </p>
+      <p>
+        Every update VARden installs by itself is signed with VARden's own update key, whatever the status above. VARden
+        refuses an update whose signature doesn't match.
+      </p>
+    </section>
+
+    <section>
+      <h2>What gets signed</h2>
+      <p>
+        Only VARden's own programs and installers, built from the public source code in the
+        <a href="https://github.com/RamezCh/VARden">GitHub repository</a> by GitHub Actions
+        (<a href="https://github.com/RamezCh/VARden/blob/main/.github/workflows/release.yml">release workflow</a>).
+        Nothing built on a personal computer is signed, and no third-party programs are signed with VARden's certificate.
+      </p>
+    </section>
+
+    <section>
+      <h2>Who can approve a release</h2>
+      <dl class="roles">
+        <div><dt>Authors</dt><dd>Ramez Chreide (<a href="https://github.com/RamezCh">@RamezCh</a>). Outside contributions are reviewed before they're merged.</dd></div>
+        <div><dt>Reviewers</dt><dd>Ramez Chreide</dd></div>
+        <div><dt>Approvers</dt><dd>Ramez Chreide. Every signed release is approved by hand.</dd></div>
+      </dl>
+      <p>All team members use multi-factor authentication for GitHub and for signing.</p>
+    </section>
+
+    <section>
+      <h2>Privacy</h2>
+      <p>
+        VARden doesn't collect or send any information about you or your variables. The one network request it makes is
+        a check for a newer version on GitHub when it starts, which you can turn off in Settings. Problem reports are
+        written and sent by you, through GitHub; VARden only prepares a cleaned copy of its log for you to review first.
+      </p>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <p>
+      Made by Ramez Chreide.
+      <a href="https://github.com/RamezCh/VARden">Source on GitHub</a>
+      <a href="https://github.com/RamezCh/VARden/blob/main/LICENSE">MIT License</a>
+    </p>
+  </footer>
+</body>
+</html>

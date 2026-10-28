@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { reportApi, type PlatformInfo, type Report } from "../lib/api";
 import { pickReportPath } from "../lib/files";
+import { copyText } from "../lib/clipboard";
 import { plural } from "../lib/useEnvironment";
 import { Button } from "./IconButton";
 import { CheckIcon, CopyIcon } from "./icons";
@@ -72,7 +73,7 @@ export function ReportProblem({
 
   const copy = async () => {
     if (!report) return;
-    await navigator.clipboard.writeText(report.text);
+    await copyText(report.text, false);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   };

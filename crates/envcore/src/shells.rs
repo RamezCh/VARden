@@ -250,10 +250,10 @@ fn find_git_bash() -> Option<PathBuf> {
         );
     }
     // git.exe normally lives in <Git>\cmd\git.exe
-    if let Ok(git) = which::which("git") {
-        if let Some(root) = git.parent().and_then(Path::parent) {
-            candidates.push(root.join("bin").join("bash.exe"));
-        }
+    if let Ok(git) = which::which("git")
+        && let Some(root) = git.parent().and_then(Path::parent)
+    {
+        candidates.push(root.join("bin").join("bash.exe"));
     }
     candidates.into_iter().find(|p| p.is_file())
 }

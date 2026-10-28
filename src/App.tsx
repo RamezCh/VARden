@@ -225,6 +225,7 @@ export default function App() {
               onDelete={env.deleteProfile}
               onApply={(p, scope) => void env.applyProfile(p, scope)}
               onTurnOff={(name) => void env.deactivateProfile(name)}
+              secretStorage={env.platform?.secretStorage}
             />
           )}
           {view === "shells" && (

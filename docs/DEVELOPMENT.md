@@ -42,10 +42,10 @@ On Windows:
 
 1. Rust via [rustup](https://rustup.rs), using the MSVC toolchain
 2. Visual Studio Build Tools with the "Desktop development with C++" workload
-3. Node.js 20 or newer
+3. Node.js 24 or newer (CI uses 26; see `.nvmrc`)
 4. WebView2 (preinstalled on Windows 10 and 11)
 
-On macOS: Xcode Command Line Tools, Rust and Node.js 20+. On Linux: Rust, Node.js 20+ and the [Tauri system packages](https://tauri.app/start/prerequisites/#linux) (`libwebkit2gtk-4.1-dev` and friends).
+On macOS: Xcode Command Line Tools, Rust and Node.js 24+. On Linux: Rust, Node.js 24+ and the [Tauri system packages](https://tauri.app/start/prerequisites/#linux) (`libwebkit2gtk-4.1-dev` and friends).
 
 ## Build and test
 
@@ -53,7 +53,8 @@ On macOS: Xcode Command Line Tools, Rust and Node.js 20+. On Linux: Rust, Node.j
 npm install
 npm run tauri dev        # dev window with hot reload
 cargo test -p envcore    # core unit tests
-npm test                 # frontend unit tests
+npm test                 # frontend logic and component tests
+cargo audit; npm audit   # known vulnerabilities (CI runs both)
 npm run tauri build      # installer in target/release/bundle
 ```
 
@@ -141,6 +142,13 @@ The sections below were written as each stage landed. They explain behaviour in 
 - **PATH editor.** On macOS and Linux an entry may only use plain `$NAME` or `${NAME}`; forms like `${x:-…}` or `${x@P}` could run code inside the double-quoted PATH line.
 - **Desktop.** The first time the window is closed, VARden asks whether to keep running in the tray. On macOS, clicking the Dock icon brings a hidden window back.
 - **Contrast.** The faint text colour meets WCAG AA (4.5:1) in both themes.
+
+### Security and upkeep
+
+- **Clipboard.** `copy_text` (`src-tauri/src/clipboard.rs`) writes through `arboard`. For secrets it asks Windows to keep the entry out of clipboard history and cloud sync (`ExcludeClipboardContentFromMonitorProcessing`, `CanIncludeInClipboardHistory`, `CanUploadToCloudClipboard`), and a background thread clears it after 30 seconds unless something else was copied since (a generation counter plus a comparison with the current text).
+- **Profile secrets.** `envcore::secret_store` keeps values that look secret (`validate::is_sensitive`) in the system password store via the `keyring` crate, under the service `io.github.ramezch.varden`, with accounts `profile/<id>/<NAME>`, `active/applied/<NAME>` and `active/previous/<NAME>`. `profiles.json` holds an empty string in their place and lists the accounts in `vaulted`. A value the store refuses (no Secret Service on Linux, or longer than Credential Manager's 2,560-byte limit) stays in the file, which sits in the private app folder. Entries no longer used are deleted on save, and secrets left in the file by older versions move on startup. Tests use `MemoryVault`.
+- **Component tests.** `*.test.tsx` files start with `// @vitest-environment jsdom` and use Testing Library; `src/test/setup.ts` adds the jest-dom matchers and a `<dialog>` polyfill. Tauri calls are mocked with `vi.mock("@tauri-apps/api/core")`.
+- **Dependencies.** Dependabot proposes npm, Cargo and GitHub Actions updates weekly. CI runs `cargo audit` and `npm audit --audit-level=moderate`, also on a weekly schedule so new advisories show up without a push. `cargo audit` currently reports only "unmaintained" warnings for GTK and zbus crates that Tauri and keyring pull in on Linux; none are vulnerabilities.
 
 ### Website
 

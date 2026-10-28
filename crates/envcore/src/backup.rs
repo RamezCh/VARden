@@ -16,7 +16,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::model::StoredVar;
-use crate::{fsutil, Error, Result};
+use crate::{Error, Result, fsutil};
 
 const META: &str = "meta.json";
 const PAYLOAD: &str = "payload";
@@ -287,10 +287,10 @@ impl BackupStore {
         let mut out = Vec::new();
         for dirent in rd.flatten() {
             let meta = dirent.path().join(META);
-            if let Ok(bytes) = fs::read(&meta) {
-                if let Ok(entry) = serde_json::from_slice::<BackupEntry>(&bytes) {
-                    out.push(entry);
-                }
+            if let Ok(bytes) = fs::read(&meta)
+                && let Ok(entry) = serde_json::from_slice::<BackupEntry>(&bytes)
+            {
+                out.push(entry);
             }
         }
         out.sort_by(|a, b| b.created_at.cmp(&a.created_at).then(b.id.cmp(&a.id)));
@@ -436,9 +436,10 @@ mod tests {
             2,
             "one per target"
         );
-        assert!(all
-            .iter()
-            .any(|e| e.original && store.payload(&e.id).unwrap() == b"version 0"));
+        assert!(
+            all.iter()
+                .any(|e| e.original && store.payload(&e.id).unwrap() == b"version 0")
+        );
         assert_eq!(count(&b), 1);
     }
 
@@ -528,11 +529,13 @@ mod tests {
         );
         let left: Vec<String> = store.list().unwrap().into_iter().map(|e| e.id).collect();
         assert_eq!(left, vec![ids[2].clone(), ids[0].clone()]);
-        assert!(store
-            .list()
-            .unwrap()
-            .iter()
-            .any(|e| e.id == ids[0] && e.original));
+        assert!(
+            store
+                .list()
+                .unwrap()
+                .iter()
+                .any(|e| e.id == ids[0] && e.original)
+        );
         assert!(store.delete(&["../x".to_string()]).is_err());
     }
 

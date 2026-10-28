@@ -170,13 +170,13 @@ fn hide_secrets(line: &str, count: &mut usize) -> String {
 
 fn hide_user(line: &str, opts: &Options, count: &mut usize) -> String {
     let mut s = line.to_string();
-    if let Some(home) = opts.home.map(|h| h.to_string_lossy().into_owned()) {
-        if home.len() > 3 {
-            let n = s.matches(&home).count();
-            if n > 0 {
-                *count += n;
-                s = s.replace(&home, "~");
-            }
+    if let Some(home) = opts.home.map(|h| h.to_string_lossy().into_owned())
+        && home.len() > 3
+    {
+        let n = s.matches(&home).count();
+        if n > 0 {
+            *count += n;
+            s = s.replace(&home, "~");
         }
     }
     if let Some(user) = opts.user_name.filter(|u| u.len() >= 3) {
@@ -217,11 +217,11 @@ fn hide_names(line: &str, opts: &Options, map: &mut BTreeMap<String, String>) ->
             continue;
         }
         let pattern = format!(r"\b{}\b", regex::escape(name));
-        if let Ok(r) = Regex::new(&pattern) {
-            if r.is_match(&s) {
-                let alias = name_for(name, map);
-                s = r.replace_all(&s, alias.as_str()).into_owned();
-            }
+        if let Ok(r) = Regex::new(&pattern)
+            && r.is_match(&s)
+        {
+            let alias = name_for(name, map);
+            s = r.replace_all(&s, alias.as_str()).into_owned();
         }
     }
     upper

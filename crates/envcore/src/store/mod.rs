@@ -10,9 +10,9 @@ pub mod windows_registry;
 
 use serde::Serialize;
 
+use crate::Result;
 use crate::backup::{BackupOutcome, BackupStore};
 use crate::model::StoredVar;
-use crate::Result;
 
 /// What a store is backed by, for display in the UI.
 #[derive(Debug, Clone, Serialize)]

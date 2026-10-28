@@ -212,7 +212,7 @@ impl PersistentStore for RegistryStore {
 pub fn broadcast_environment_change() {
     std::thread::spawn(|| {
         use windows_sys::Win32::UI::WindowsAndMessaging::{
-            SendMessageTimeoutW, HWND_BROADCAST, SMTO_ABORTIFHUNG, WM_SETTINGCHANGE,
+            HWND_BROADCAST, SMTO_ABORTIFHUNG, SendMessageTimeoutW, WM_SETTINGCHANGE,
         };
         let area: Vec<u16> = "Environment".encode_utf16().chain(once(0)).collect();
         let mut result: usize = 0;

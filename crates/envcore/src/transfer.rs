@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::Result;
 use crate::backup::BackupOutcome;
 use crate::dotenv::{self, EnvEntry};
-use crate::manager::{resolver, EnvManager};
+use crate::manager::{EnvManager, resolver};
 use crate::model::Scope;
-use crate::Result;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]

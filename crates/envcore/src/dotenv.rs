@@ -11,7 +11,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::validate::validate_key;
-use crate::{fsutil, Error, Result};
+use crate::{Error, Result, fsutil};
 
 /// `.env` files larger than this are almost certainly not `.env` files.
 const MAX_BYTES: u64 = 1024 * 1024;

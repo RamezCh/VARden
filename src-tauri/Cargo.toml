@@ -28,3 +28,4 @@ tauri-plugin-process = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-opener = "2"
 dirs.workspace = true
+arboard = { version = "3", default-features = false, features = ["wayland-data-control"] }

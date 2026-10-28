@@ -192,10 +192,12 @@ mod tests {
         fs::write(&real, "old").unwrap();
         std::os::unix::fs::symlink(&real, &link).unwrap();
         write_atomic(&link, b"new").unwrap();
-        assert!(fs::symlink_metadata(&link)
-            .unwrap()
-            .file_type()
-            .is_symlink());
+        assert!(
+            fs::symlink_metadata(&link)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
         assert_eq!(fs::read_to_string(&real).unwrap(), "new");
     }
 }

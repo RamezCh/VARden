@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # Weekly, so newly published security advisories are caught even when
+  # nothing in the repository changed.
+  schedule:
+    - cron: "17 6 * * 1"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -23,10 +27,12 @@ jobs:
         include:
           - { name: Windows, os: windows-latest }
           - { name: macOS, os: macos-latest }
+          # 22.04 on purpose: Linux builds made on the oldest supported
+          # glibc run on more distributions.
           - { name: Linux, os: ubuntu-22.04 }
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Linux build dependencies and test shells
         if: runner.os == 'Linux'
@@ -44,9 +50,9 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 26
           cache: npm
 
       - name: Install npm packages
@@ -70,3 +76,23 @@ jobs:
 
       - name: Build the app
         run: npx tauri build --debug --no-bundle
+
+  audit:
+    name: Security audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      - name: Rust dependencies (RustSec advisory database)
+        run: cargo audit
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+
+      - name: npm dependencies (GitHub advisory database)
+        run: npm audit --audit-level=moderate

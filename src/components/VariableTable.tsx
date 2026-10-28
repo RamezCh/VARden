@@ -4,6 +4,7 @@ import { rowId, STATUS_META, type SortKey, type SortState } from "../lib/filter"
 import { Button, IconButton } from "./IconButton";
 import { CheckIcon, ChevronRightIcon, CopyIcon, EyeIcon, EyeOffIcon, PencilIcon, SortIcon, TrashIcon } from "./icons";
 import { SecretValue } from "./SecretValue";
+import { copyText } from "../lib/clipboard";
 import { StatusPill } from "./StatusStrip";
 import { Help } from "./Help";
 import { HELP } from "../lib/helpText";
@@ -155,20 +156,21 @@ function listEntries(v: EnvVar, sep: string): string[] | null {
 const isLong = (v: EnvVar, sep: string) =>
   v.value.length > 48 || Boolean(v.expanded) || listEntries(v, sep) !== null || v.missingPaths.length > 0;
 
-function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
+function CopyButton({ text, secret, label = "Copy" }: { text: string; secret: boolean; label?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <Button
       variant="quiet"
       className="h-7 px-2 text-xs"
+      title={secret ? "Secrets are cleared from the clipboard after 30 seconds" : undefined}
       onClick={async () => {
-        await navigator.clipboard.writeText(text);
+        await copyText(text, secret);
         setCopied(true);
         window.setTimeout(() => setCopied(false), 1400);
       }}
     >
       {copied ? <CheckIcon className="text-synced" /> : <CopyIcon />}
-      {copied ? "Copied" : label}
+      {copied ? (secret ? "Copied for 30 s" : "Copied") : label}
     </Button>
   );
 }
@@ -189,7 +191,7 @@ function ValueDetails({ v, sep }: { v: EnvVar; sep: string }) {
                 <span className="text-missing"> · {v.missingPaths.length} don't exist</span>
               )}
             </span>
-            <CopyButton text={v.value} label="Copy value" />
+            <CopyButton text={v.value} secret={v.sensitive} label="Copy value" />
           </div>
           <ol className="selectable max-h-72 space-y-0.5 overflow-y-auto">
             {entries.map((e, i) => {
@@ -208,7 +210,7 @@ function ValueDetails({ v, sep }: { v: EnvVar; sep: string }) {
         <>
           <div className="flex items-start justify-between gap-2">
             <p className="selectable min-w-0 whitespace-pre-wrap break-all font-mono text-[0.85rem]">{v.value}</p>
-            <CopyButton text={v.value} />
+            <CopyButton text={v.value} secret={v.sensitive} />
           </div>
           {v.expanded && (
             <p className="selectable mt-2 break-all text-xs text-muted">

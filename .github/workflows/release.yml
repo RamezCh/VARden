@@ -37,7 +37,7 @@ jobs:
           - { name: Linux, os: ubuntu-22.04, args: "" }
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check the update key is set up
         shell: bash
@@ -65,16 +65,46 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 26
           cache: npm
 
       - name: Install npm packages
         run: npm ci
 
+      # macOS signing and notarization switch on by themselves once the
+      # Apple secrets exist (see docs/RELEASING.md). Exporting them only when
+      # set keeps unsigned builds working: an empty APPLE_CERTIFICATE would
+      # make the build try, and fail, to import a certificate.
+      - name: Use the Apple signing identity, if set up
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "No Apple signing identity yet: the macOS build stays unsigned."
+            exit 0
+          fi
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            value="${!name}"
+            echo "::add-mask::$value"
+            {
+              echo "$name<<__VARDEN_EOF__"
+              echo "$value"
+              echo "__VARDEN_EOF__"
+            } >> "$GITHUB_ENV"
+          done
+          echo "Signing and notarizing the macOS build."
+
       - name: Build installers and attach them to a draft release
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -87,5 +117,5 @@ jobs:
             Installed copies of VARden offer this update on their own once the release is published.
           releaseDraft: true
           prerelease: false
-          includeUpdaterJson: true
+          uploadUpdaterJson: true
           args: ${{ matrix.args }} --config {"bundle":{"createUpdaterArtifacts":true}}

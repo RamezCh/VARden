@@ -9,10 +9,13 @@
 //!   it isn't written, and while the profile is active the variable shows as
 //!   Missing until it has a value.
 //!
-//! Stored in `profiles.json` in the app folder. Like the registry and the
-//! startup files themselves, values are plain text.
+//! Stored in `profiles.json` in the app folder. Values that look secret
+//! (by name, or a connection string with a password) are kept in the system
+//! password store instead (see [`crate::secret_store`]); the file then only
+//! records that they are there. Where no password store is available they stay
+//! in the file.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 
 use chrono::{DateTime, Utc};
@@ -22,8 +25,8 @@ use crate::backup::BackupOutcome;
 use crate::dotenv::EnvEntry;
 use crate::manager::EnvManager;
 use crate::model::Scope;
-use crate::validate::{validate_key, validate_value};
-use crate::{fsutil, Error, Result};
+use crate::validate::{is_sensitive, validate_key, validate_value};
+use crate::{Error, Result, fsutil};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -62,6 +65,53 @@ struct ActiveProfile {
 struct ProfilesFile {
     profiles: Vec<Profile>,
     active: Option<ActiveProfile>,
+    /// Values kept in the system password store, by account name (see
+    /// [`account`]). Their place in this file holds an empty string.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    vaulted: BTreeSet<String>,
+}
+
+/// Where in the file a value lives; also its account name in the vault.
+enum Slot<'a> {
+    Profile(&'a str, &'a str),
+    Applied(&'a str),
+    Previous(&'a str),
+}
+
+fn account(slot: Slot) -> String {
+    match slot {
+        Slot::Profile(id, key) => format!("profile/{id}/{key}"),
+        Slot::Applied(key) => format!("active/applied/{key}"),
+        Slot::Previous(key) => format!("active/previous/{key}"),
+    }
+}
+
+impl ProfilesFile {
+    /// Every value in the file with its account name, for moving secrets in
+    /// and out of the vault.
+    fn values_mut(&mut self) -> Vec<(String, &str, &mut String)> {
+        let mut out = Vec::new();
+        for p in self.profiles.iter_mut() {
+            for e in p.vars.iter_mut() {
+                out.push((
+                    account(Slot::Profile(&p.id, &e.key)),
+                    e.key.as_str(),
+                    &mut e.value,
+                ));
+            }
+        }
+        if let Some(a) = self.active.as_mut() {
+            for e in a.applied.iter_mut() {
+                out.push((account(Slot::Applied(&e.key)), e.key.as_str(), &mut e.value));
+            }
+            for (k, v) in a.previous.iter_mut() {
+                if let Some(v) = v.as_mut() {
+                    out.push((account(Slot::Previous(k)), k.as_str(), v));
+                }
+            }
+        }
+        out
+    }
 }
 
 /// What the UI sees. Previous values are never sent to the frontend.
@@ -95,28 +145,89 @@ fn slug(name: &str) -> String {
         })
         .collect();
     let s = s.trim_matches('-').to_string();
-    if s.is_empty() {
-        "profile".into()
-    } else {
-        s
-    }
+    if s.is_empty() { "profile".into() } else { s }
 }
 
 impl EnvManager {
-    fn load_profiles(&self) -> ProfilesFile {
+    /// The file as stored: vaulted values are still empty.
+    fn read_profiles_file(&self) -> ProfilesFile {
         fs::read(&self.profiles_path)
             .ok()
             .and_then(|b| serde_json::from_slice(&b).ok())
             .unwrap_or_default()
     }
 
+    /// The file with every value filled in, vaulted ones included.
+    fn load_profiles(&self) -> ProfilesFile {
+        let mut file = self.read_profiles_file();
+        if file.vaulted.is_empty() {
+            return file;
+        }
+        let vaulted = std::mem::take(&mut file.vaulted);
+        for (acct, key, value) in file.values_mut() {
+            if vaulted.contains(&acct) {
+                match self.vault.get(&acct) {
+                    Some(v) => *value = v,
+                    None => log::warn!(
+                        "The saved value of {key} is missing from {}.",
+                        self.vault.describe()
+                    ),
+                }
+            }
+        }
+        file
+    }
+
+    /// Save the file, moving secret values into the vault and removing vault
+    /// entries that are no longer used.
     fn save_profiles(&self, file: &ProfilesFile) -> Result<()> {
-        fsutil::write_atomic(&self.profiles_path, &serde_json::to_vec_pretty(file)?)
+        let before = self.read_profiles_file().vaulted;
+        let mut out = ProfilesFile {
+            profiles: file.profiles.clone(),
+            active: file.active.clone(),
+            vaulted: BTreeSet::new(),
+        };
+        let mut vaulted = BTreeSet::new();
+        for (acct, key, value) in out.values_mut() {
+            if !value.is_empty() && is_sensitive(key, value) && self.vault.set(&acct, value) {
+                value.clear();
+                vaulted.insert(acct);
+            }
+        }
+        out.vaulted = vaulted;
+        fsutil::write_atomic(&self.profiles_path, &serde_json::to_vec_pretty(&out)?)?;
+        for acct in before.difference(&out.vaulted) {
+            self.vault.delete(acct);
+        }
+        Ok(())
+    }
+
+    /// Move secret values an older version left in `profiles.json` into the
+    /// system password store.
+    pub fn secure_profile_secrets(&self) {
+        // Vaulted values are empty in the file, so anything secret left is plain text.
+        let mut raw = self.read_profiles_file();
+        let plain = raw
+            .values_mut()
+            .iter()
+            .any(|(_, key, v)| !v.is_empty() && is_sensitive(key, v));
+        if plain {
+            let file = self.load_profiles();
+            if let Err(e) = self.save_profiles(&file) {
+                log::warn!("Couldn't move profile secrets to the password store: {e}");
+            }
+        }
+    }
+
+    /// Where secret profile values are kept, for Settings.
+    pub fn secret_storage(&self) -> &'static str {
+        self.vault.describe()
     }
 
     /// Keys of the active profile, shown as Missing when they have no value.
     pub(crate) fn active_profile_keys(&self) -> Vec<String> {
-        let file = self.load_profiles();
+        // Names only: no need to read the vault.
+        let file = self.read_profiles_file();
         let Some(active) = &file.active else {
             return Vec::new();
         };
@@ -284,7 +395,9 @@ mod tests {
     use super::*;
     use crate::backup::BackupStore;
     use crate::managed_block::Syntax;
+    use crate::manager::lock;
     use crate::model::Status;
+    use crate::secret_store::MemoryVault;
     use crate::status::EnvSnapshot;
     use crate::store::shell_file::ShellFileStore;
     use std::sync::Arc;
@@ -307,6 +420,111 @@ mod tests {
             ))],
         );
         (dir, m)
+    }
+
+    fn setup_vault(max_len: Option<usize>) -> (tempfile::TempDir, EnvManager, Arc<MemoryVault>) {
+        let (dir, m) = setup();
+        let vault = Arc::new(MemoryVault {
+            max_len,
+            ..Default::default()
+        });
+        (dir, m.with_vault(vault.clone()), vault)
+    }
+
+    fn file_text(m: &EnvManager) -> String {
+        fs::read_to_string(&m.profiles_path).unwrap()
+    }
+
+    #[test]
+    fn secret_values_live_in_the_vault_not_the_file() {
+        let (_dir, m, vault) = setup_vault(None);
+        m.set("OPENAI_API_KEY", "sk-old-one", Scope::User).unwrap();
+        let id = m
+            .save_profile(Profile {
+                id: String::new(),
+                name: "Client A".into(),
+                vars: vec![
+                    entry("OPENAI_API_KEY", "sk-client-a"),
+                    entry("DATABASE_URL", "postgres://me:hunter2@db/app"),
+                    entry("REGION", "eu-west-1"),
+                ],
+            })
+            .unwrap()
+            .profiles[0]
+            .id
+            .clone();
+
+        let text = file_text(&m);
+        assert!(
+            !text.contains("sk-client-a") && !text.contains("hunter2"),
+            "{text}"
+        );
+        assert!(
+            text.contains("eu-west-1"),
+            "ordinary values stay in the file"
+        );
+        assert_eq!(lock(&vault.entries).len(), 2);
+
+        // The app still sees the real values.
+        let p = &m.profiles().profiles[0];
+        assert_eq!(p.vars[0].value, "sk-client-a");
+        assert_eq!(p.vars[1].value, "postgres://me:hunter2@db/app");
+
+        // Applying keeps the remembered old value out of the file too.
+        m.apply_profile(&id, Scope::User).unwrap();
+        let text = file_text(&m);
+        assert!(
+            !text.contains("sk-old-one") && !text.contains("sk-client-a"),
+            "{text}"
+        );
+        assert!(!m.profiles().active.unwrap().outdated);
+        m.deactivate_profile().unwrap();
+        assert_eq!(
+            value(&m, "OPENAI_API_KEY", Scope::User).as_deref(),
+            Some("sk-old-one")
+        );
+
+        // Entries that are no longer used are removed from the vault.
+        m.delete_profile(&id).unwrap();
+        assert!(lock(&vault.entries).is_empty());
+    }
+
+    #[test]
+    fn values_the_vault_refuses_stay_in_the_file() {
+        let (_dir, m, vault) = setup_vault(Some(8));
+        m.save_profile(Profile {
+            id: String::new(),
+            name: "Long".into(),
+            vars: vec![
+                entry("SHORT_TOKEN", "t-123"),
+                entry("LONG_TOKEN", "t-1234567890"),
+            ],
+        })
+        .unwrap();
+        assert_eq!(lock(&vault.entries).len(), 1);
+        assert!(file_text(&m).contains("t-1234567890"));
+        assert_eq!(m.profiles().profiles[0].vars[1].value, "t-1234567890");
+    }
+
+    #[test]
+    fn plain_text_secrets_from_older_versions_are_moved() {
+        let (_dir, m) = setup();
+        m.save_profile(Profile {
+            id: String::new(),
+            name: "Old".into(),
+            vars: vec![entry("GITHUB_TOKEN", "ghp_abc")],
+        })
+        .unwrap();
+        assert!(
+            file_text(&m).contains("ghp_abc"),
+            "no vault: stays in the file"
+        );
+
+        let vault = Arc::new(MemoryVault::default());
+        let m = m.with_vault(vault.clone());
+        m.secure_profile_secrets();
+        assert!(!file_text(&m).contains("ghp_abc"));
+        assert_eq!(m.profiles().profiles[0].vars[0].value, "ghp_abc");
     }
 
     fn value(m: &EnvManager, k: &str, scope: Scope) -> Option<String> {

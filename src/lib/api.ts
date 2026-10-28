@@ -34,6 +34,8 @@ export interface PlatformInfo {
   stores: StoreInfo[];
   backupDir: string;
   configurableTargets: boolean;
+  /** Where profiles keep secret values. */
+  secretStorage: string;
 }
 
 export interface DetectedShell {

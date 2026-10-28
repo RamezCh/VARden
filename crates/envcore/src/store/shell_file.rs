@@ -5,7 +5,7 @@ use crate::managed_block::{self, Block, Syntax};
 use crate::model::{StoredVar, ValueKind};
 use crate::store::{PersistentStore, StoreInfo};
 use crate::validate::{validate_key, validate_value};
-use crate::{fsutil, Error, Result};
+use crate::{Error, Result, fsutil};
 
 /// A shell config file whose managed block holds our variables.
 #[derive(Debug, Clone)]

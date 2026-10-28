@@ -133,8 +133,10 @@ mod tests {
         assert_eq!(backups.len(), 2);
         assert!(backups.iter().any(|b| b.id == original));
         // Nothing left to do on the next start.
-        assert!(migrate_legacy(&new, &[env_mgr, chreide])
-            .unwrap()
-            .is_empty());
+        assert!(
+            migrate_legacy(&new, &[env_mgr, chreide])
+                .unwrap()
+                .is_empty()
+        );
     }
 }

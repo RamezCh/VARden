@@ -137,8 +137,8 @@ mod registry {
             .name("env-watch-registry".into())
             .spawn(move || {
                 use windows_sys::Win32::System::Registry::{
-                    RegCloseKey, RegNotifyChangeKeyValue, RegOpenKeyExW, HKEY, HKEY_CURRENT_USER,
-                    KEY_NOTIFY, REG_NOTIFY_CHANGE_LAST_SET, REG_NOTIFY_CHANGE_NAME,
+                    HKEY, HKEY_CURRENT_USER, KEY_NOTIFY, REG_NOTIFY_CHANGE_LAST_SET,
+                    REG_NOTIFY_CHANGE_NAME, RegCloseKey, RegNotifyChangeKeyValue, RegOpenKeyExW,
                 };
                 let name: Vec<u16> = "Environment\0".encode_utf16().collect();
                 let mut key: HKEY = std::ptr::null_mut();

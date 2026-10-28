@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CheckIcon, CopyIcon, EyeIcon, EyeOffIcon } from "./icons";
 import { IconButton } from "./IconButton";
+import { copyText } from "../lib/clipboard";
 
 const MASK = "••••••••••••";
 
@@ -20,7 +21,7 @@ export function SecretValue({ value, sensitive, revealed, onToggle }: Props) {
   const masked = sensitive && !revealed;
 
   const copy = async () => {
-    await navigator.clipboard.writeText(value);
+    await copyText(value, sensitive);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1400);
   };
@@ -40,7 +41,7 @@ export function SecretValue({ value, sensitive, revealed, onToggle }: Props) {
       )}
       {value !== "" && (
         <IconButton
-          label={copied ? "Copied" : "Copy value"}
+          label={copied ? (sensitive ? "Copied; cleared from the clipboard in 30 seconds" : "Copied") : "Copy value"}
           onClick={() => void copy()}
           className="opacity-0 focus-visible:opacity-100 group-hover/value:opacity-100"
         >

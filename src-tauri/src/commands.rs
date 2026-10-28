@@ -5,6 +5,7 @@
 
 use std::path::PathBuf;
 
+use envcore::Error;
 use envcore::backup::{BackupEntry, BackupOutcome, DeleteReport};
 use envcore::diagnostics::{self, Sanitized};
 use envcore::dotenv::{self, EnvEntry, ParsedEnv};
@@ -14,7 +15,6 @@ use envcore::path_editor::PathInfo;
 use envcore::shells::{self, DetectedShell, ShellKind};
 use envcore::terminal::{SyncReport, TerminalSyncInfo};
 use envcore::transfer::{ExportItem, ExportReport};
-use envcore::Error;
 use serde::Serialize;
 use std::sync::Mutex;
 
@@ -525,4 +525,18 @@ pub async fn prepare_report(mgr: State<'_, EnvManager>, keep_names: bool) -> Cmd
 pub async fn save_report(path: PathBuf, text: String) -> CmdResult<()> {
     std::fs::write(&path, text)
         .map_err(|e| Error::Refused(format!("Couldn't save {}: {e}", path.display())))
+}
+
+/// Copy to the clipboard; secrets stay out of clipboard history and are
+/// cleared after 30 seconds (see clipboard.rs).
+#[tauri::command]
+pub async fn copy_text(
+    clipboard: State<'_, std::sync::Arc<crate::clipboard::Clipboard>>,
+    text: String,
+    secret: bool,
+) -> CmdResult<()> {
+    clipboard
+        .inner()
+        .copy(text, secret)
+        .map_err(|e| Error::Refused(format!("Couldn't copy: {e}")))
 }

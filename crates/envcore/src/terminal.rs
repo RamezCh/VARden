@@ -9,10 +9,10 @@ use serde::Serialize;
 
 use crate::backup::BackupOutcome;
 use crate::managed_block::{self, HOOK};
-use crate::manager::{lock, resolver, EnvManager};
+use crate::manager::{EnvManager, lock, resolver};
 use crate::shells::{self, DetectedShell, ShellKind};
 use crate::sync::{self, Desired, HookShell, SyncState};
-use crate::{fsutil, Error, Result};
+use crate::{Error, Result, fsutil};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -422,11 +422,12 @@ mod tests {
                 .replace("# <<< END", "export GOPATH=\"$HOME/go\"\n# <<< END"),
         )
         .unwrap();
-        assert!(m
-            .list(&[])
-            .unwrap()
-            .iter()
-            .all(|r| r.status != Status::ActiveSynced));
+        assert!(
+            m.list(&[])
+                .unwrap()
+                .iter()
+                .all(|r| r.status != Status::ActiveSynced)
+        );
 
         let report = m.sync_terminals().unwrap();
         assert_eq!(
@@ -448,32 +449,39 @@ mod tests {
 
         // Temporary variables reach terminals too, and leave them when removed.
         m.set("TEMP_FLAG", "on", Scope::Process).unwrap();
-        assert!(m
-            .list(&[])
-            .unwrap()
-            .iter()
-            .any(|r| r.key == "TEMP_FLAG" && r.pending_sync));
+        assert!(
+            m.list(&[])
+                .unwrap()
+                .iter()
+                .any(|r| r.key == "TEMP_FLAG" && r.pending_sync)
+        );
         m.sync_terminals().unwrap();
-        assert!(std::fs::read_to_string(dir.path().join("sync/apply.sh"))
-            .unwrap()
-            .contains("export TEMP_FLAG='on'"));
+        assert!(
+            std::fs::read_to_string(dir.path().join("sync/apply.sh"))
+                .unwrap()
+                .contains("export TEMP_FLAG='on'")
+        );
         assert!(
             m.list(&[]).unwrap().iter().all(|r| !r.pending_sync),
             "nothing left to sync"
         );
         m.remove("TEMP_FLAG", Scope::Process).unwrap();
         m.sync_terminals().unwrap();
-        assert!(std::fs::read_to_string(dir.path().join("sync/apply.sh"))
-            .unwrap()
-            .contains("unset TEMP_FLAG"));
+        assert!(
+            std::fs::read_to_string(dir.path().join("sync/apply.sh"))
+                .unwrap()
+                .contains("unset TEMP_FLAG")
+        );
 
         m.remove("API_URL", Scope::User).unwrap();
         let report = m.sync_terminals().unwrap();
         assert_eq!(report.generation, 4);
         assert!(report.removed >= 1);
-        assert!(std::fs::read_to_string(dir.path().join("sync/apply.sh"))
-            .unwrap()
-            .contains("unset API_URL"));
+        assert!(
+            std::fs::read_to_string(dir.path().join("sync/apply.sh"))
+                .unwrap()
+                .contains("unset API_URL")
+        );
     }
 
     #[cfg(unix)]
@@ -492,10 +500,11 @@ mod tests {
         )
         .with_dirs(dir.path().join("sync"), dir.path().join("shell"));
 
-        assert!(m
-            .install_into(&profile, HookShell::Posix)
-            .unwrap()
-            .is_some());
+        assert!(
+            m.install_into(&profile, HookShell::Posix)
+                .unwrap()
+                .is_some()
+        );
         assert!(
             m.install_into(&profile, HookShell::Posix)
                 .unwrap()
@@ -554,10 +563,11 @@ printf '%s\n' "${FRESH-unset}"
             .unwrap()
             .replace("VARDEN SHELL HOOK", "ENVMANAGER SHELL HOOK");
         std::fs::write(&profile, &legacy).unwrap();
-        assert!(m
-            .install_into(&profile, HookShell::Posix)
-            .unwrap()
-            .is_some());
+        assert!(
+            m.install_into(&profile, HookShell::Posix)
+                .unwrap()
+                .is_some()
+        );
         let upgraded = std::fs::read_to_string(&profile).unwrap();
         assert_eq!(upgraded.matches("SHELL HOOK >>>").count(), 1);
         assert!(upgraded.contains("# >>> VARDEN SHELL HOOK >>>"));

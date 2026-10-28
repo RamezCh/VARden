@@ -325,8 +325,9 @@ On purpose. System variables affect every account on the computer and need admin
 
 VARden stores values exactly where your operating system expects them: the Windows registry, or your shell's startup file. That's the same place they'd be if you set them any other way, and it's what programs read. VARden doesn't add encryption, because programs couldn't read encrypted values. What it does add:
 
-- Secrets are masked on screen and can be copied without being shown.
+- Secrets are masked on screen and can be copied without being shown. A copied secret is kept out of clipboard history and cloud clipboard sync, and is cleared from the clipboard after 30 seconds (unless you've copied something else since).
 - Masked values can't be found by searching.
+- Profiles are different: they belong to VARden, not to programs, so their keys, tokens and passwords are kept in your system's password store (Windows Credential Manager, the macOS keychain, or the Secret Service on Linux) instead of VARden's files. If no password store is available, they stay in VARden's private app folder.
 - The log file records variable *names*, never values. When you report a problem, VARden shows you a cleaned copy with names, your user name and anything key-like hidden, and you decide whether to share it.
 - Values are never sent anywhere. The only network request is the optional update check.
 </details>
@@ -375,10 +376,19 @@ VARden is built in stages. See [ROADMAP.md](ROADMAP.md) for the full list.
 - [x] Broken-path detection, profiles, custom startup files
 - [x] Safe PATH editor, rename, bulk actions, light and dark themes
 - [x] Installers, an uninstaller that cleans up hooks, signed auto-updates, a tray icon, Settings
-- [ ] **Next:** license, contributing guide and the first published release
+- [x] MIT license, contributing guide, security policy, dependency audits
+- [ ] **Next:** the first published release, then code signing
 
 ## Developing
 
 VARden is a [Tauri 2](https://tauri.app) app: the core is plain Rust (`crates/envcore`, fully unit-tested, no UI), and the interface is React with Tailwind CSS. Every push is checked on Windows, macOS and Linux, including the terminal hooks in real bash, zsh, fish and PowerShell.
 
 See **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** for the code layout, build steps, design decisions and the full command list.
+
+## Contributing
+
+Bug reports, ideas and pull requests are welcome. Start with **[CONTRIBUTING.md](CONTRIBUTING.md)**; please report security problems privately as described in **[SECURITY.md](SECURITY.md)**.
+
+## License
+
+VARden is free and open source under the [MIT License](LICENSE).

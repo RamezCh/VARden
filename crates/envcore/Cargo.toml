@@ -15,6 +15,7 @@ which = "8"
 log = "0.4"
 notify = "8"
 regex = "1"
+keyring = "4"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56"

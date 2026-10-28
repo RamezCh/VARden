@@ -237,11 +237,7 @@ fn values_match(key: &str, expected: &str, current: &str, sep: char, ci: bool) -
     }
     let clean = |s: &str| {
         let s = s.trim().trim_end_matches(['/', '\\']).to_string();
-        if ci {
-            s.to_ascii_lowercase()
-        } else {
-            s
-        }
+        if ci { s.to_ascii_lowercase() } else { s }
     };
     let have: Vec<String> = current.split(sep).map(clean).collect();
     expected
