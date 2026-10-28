@@ -1,6 +1,8 @@
 # Environment Manager
 
-A Tauri 2 desktop app for managing **user-level** (persistent) and **process-level** (session) environment variables. It never writes system-level variables, so it never needs admin rights.
+[![CI](https://github.com/RamezCh/VARden/actions/workflows/ci.yml/badge.svg)](https://github.com/RamezCh/VARden/actions/workflows/ci.yml)
+
+A Tauri 2 desktop app for managing **user-level** (persistent) and **temporary** environment variables (pushed into open terminals, never saved). It never writes system-level variables, so it never needs admin rights.
 
 ## Layout
 
@@ -19,6 +21,7 @@ crates/envcore/        Platform core: plain Rust, no Tauri, fully unit-tested
   src/dotenv.rs          .env parser and writer
   src/transfer.rs        .env import/export
   src/paths.rs           App data folder (%LOCALAPPDATA%\EnvManager)
+  src/watch.rs           Notices outside changes (registry notifications, file watcher)
 src-tauri/             Tauri app: commands.rs wraps EnvManager
 src/                   React + Tailwind v4 frontend
   lib/api.ts             Typed wrappers for every Tauri command
@@ -74,6 +77,15 @@ npm run tauri build      # installer in target/release/bundle
 - **.env export.** Pick variables, preselected from what the table is currently showing, then choose where to save. You're warned when secrets would be written as plain text. Windows `%VAR%` values are written expanded.
 - **Recovery.** Before a restore, the Backups page lists exactly which variables would come back, change or be removed. Every change's toast has **Undo**. An error about a damaged managed block offers a shortcut to Backups.
 
+## Stage 1: foundation
+
+- **One instance.** Launching the app while it's already running brings the open window to the front instead of starting a second copy, so two windows can never write at the same time.
+- **Automatic refresh.** Changes made outside the app (`setx`, the Windows dialog, an editor saving `.zshrc`) show up on their own. On Windows the app subscribes to change notifications for `HKCU\Environment`. On every platform it watches the folders that hold the startup files, which also catches editors that save by replacing the file. Bursts of events become one refresh, and the echo of the app's own writes is ignored. The window also refreshes when it regains focus, and a notice appears when something changed.
+- **Log file.** Diagnostics are written to `%LOCALAPPDATA%\EnvManager\logs` (macOS `~/Library/Application Support/EnvManager/logs`, Linux `~/.local/share/EnvManager/logs`): at most 5 files of 1 MB each. Logs contain variable names and actions, never values. **Open log folder** in the sidebar opens it.
+- **CI.** Every push runs formatting, clippy, Rust and frontend tests and a full app build on Windows, macOS and Linux, including the terminal hook in real bash, zsh, fish and PowerShell.
+
+See [ROADMAP.md](ROADMAP.md) for what comes next.
+
 ## Backups page and help
 
 - **Grouped by day.** Today, Yesterday, then dated groups. Each row shows the time and what the backup was taken before.
@@ -82,4 +94,4 @@ npm run tauri build      # installer in target/release/bundle
 
 ## Tauri commands
 
-`get_platform_info`, `list_variables`, `set_variable`, `delete_variable`, `detect_shells`, `get_shell_targets`, `set_shell_targets`, `list_backups`, `preview_restore`, `restore_backup`, `delete_backups`, `get_terminal_sync`, `install_terminal_hook`, `remove_terminal_hook`, `sync_terminals`, `read_env_file`, `import_variables`, `export_env_file`. Each mutation returns the refreshed variable list plus the backups it created.
+`get_platform_info`, `list_variables`, `set_variable`, `delete_variable`, `detect_shells`, `get_shell_targets`, `set_shell_targets`, `list_backups`, `preview_restore`, `restore_backup`, `delete_backups`, `get_terminal_sync`, `install_terminal_hook`, `remove_terminal_hook`, `sync_terminals`, `read_env_file`, `import_variables`, `export_env_file`, `open_logs_folder`. Each mutation returns the refreshed variable list plus the backups it created.

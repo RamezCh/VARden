@@ -65,8 +65,14 @@ export function useEnvironment(notify: Notify, openBackups: () => void) {
     [notify, openBackups],
   );
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  /**
+   * Re-read everything. `quiet` is for automatic refreshes (outside changes,
+   * window focus): no loading state, no error toasts, and it reports whether
+   * the variables actually changed.
+   */
+  const varsRef = useRef<EnvVar[]>([]);
+  const refresh = useCallback(async ({ quiet = false } = {}): Promise<boolean> => {
+    if (!quiet) setLoading(true);
     try {
       const [p, v, s, b, t] = await Promise.all([
         api.platformInfo(),
@@ -75,17 +81,59 @@ export function useEnvironment(notify: Notify, openBackups: () => void) {
         api.listBackups(),
         syncApi.terminalSync(),
       ]);
+      const changed = JSON.stringify(v) !== JSON.stringify(varsRef.current);
       setPlatform(p);
       setVars(v);
       setShells(s);
       setBackups(b);
       setSync(t);
+      return changed;
     } catch (e) {
-      notify("error", `Couldn't read your environment: ${String(e)}`);
+      if (quiet) console.warn("Background refresh failed", e);
+      else notify("error", `Couldn't read your environment: ${String(e)}`);
+      return false;
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   }, [notify]);
+  varsRef.current = vars;
+
+  // Changes made outside the app (setx, the Windows dialog, an editor on
+  // .zshrc) are reported by the backend; the window regaining focus is a
+  // cheap catch-all on top.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    let lastFocusRefresh = 0;
+    (async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        const offChange = await listen("environment-changed", async () => {
+          if (await refresh({ quiet: true })) {
+            notify("info", "Your variables were changed outside the app. The list is up to date.");
+          }
+        });
+        const offFocus = await getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+          if (focused && Date.now() - lastFocusRefresh > 3000) {
+            lastFocusRefresh = Date.now();
+            void refresh({ quiet: true });
+          }
+        });
+        unlisten = () => {
+          offChange();
+          offFocus();
+        };
+        if (cancelled) unlisten();
+      } catch {
+        /* not running inside Tauri */
+      }
+    })();
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [refresh, notify]);
 
   useEffect(() => {
     void refresh();

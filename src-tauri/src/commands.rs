@@ -18,6 +18,16 @@ use tauri::State;
 
 type CmdResult<T> = Result<T, Error>;
 
+/// Log the outcome of a user action. Only variable names go into the log,
+/// never values: the log file must not leak secrets.
+fn logged<T>(action: impl std::fmt::Display, result: CmdResult<T>) -> CmdResult<T> {
+    match &result {
+        Ok(_) => log::info!("{action}"),
+        Err(e) => log::error!("{action} failed: {e}"),
+    }
+    result
+}
+
 /// Result of a mutation: the refreshed table plus any backups taken, so the
 /// UI can offer an immediate "Undo".
 #[derive(Serialize)]
@@ -47,7 +57,11 @@ pub async fn set_variable(
     value: String,
     scope: Scope,
 ) -> CmdResult<MutationResult> {
-    let backups = mgr.set(key.trim(), &value, scope)?;
+    let key = key.trim();
+    let backups = logged(
+        format!("Set {key} ({scope:?})"),
+        mgr.set(key, &value, scope),
+    )?;
     Ok(MutationResult {
         variables: mgr.list(&[])?,
         backups,
@@ -60,7 +74,10 @@ pub async fn delete_variable(
     key: String,
     scope: Scope,
 ) -> CmdResult<MutationResult> {
-    let backups = mgr.remove(&key, scope)?;
+    let backups = logged(
+        format!("Deleted {key} ({scope:?})"),
+        mgr.remove(&key, scope),
+    )?;
     Ok(MutationResult {
         variables: mgr.list(&[])?,
         backups,
@@ -82,7 +99,14 @@ pub async fn set_shell_targets(
     mgr: State<'_, EnvManager>,
     targets: Vec<ShellTarget>,
 ) -> CmdResult<Vec<ShellTarget>> {
-    mgr.set_shell_targets(targets)?;
+    let names: Vec<String> = targets
+        .iter()
+        .map(|t| t.path.display().to_string())
+        .collect();
+    logged(
+        format!("Set startup files: {}", names.join(", ")),
+        mgr.set_shell_targets(targets),
+    )?;
     Ok(mgr.shell_targets())
 }
 
@@ -93,7 +117,7 @@ pub async fn list_backups(mgr: State<'_, EnvManager>) -> CmdResult<Vec<BackupEnt
 
 #[tauri::command]
 pub async fn restore_backup(mgr: State<'_, EnvManager>, id: String) -> CmdResult<MutationResult> {
-    let safety = mgr.restore(&id)?;
+    let safety = logged(format!("Restored backup {id}"), mgr.restore(&id))?;
     Ok(MutationResult {
         variables: mgr.list(&[])?,
         backups: vec![safety],
@@ -125,7 +149,10 @@ pub async fn install_terminal_hook(
     mgr: State<'_, EnvManager>,
     kind: ShellKind,
 ) -> CmdResult<HookResult> {
-    let backup = mgr.install_hook(kind)?;
+    let backup = logged(
+        format!("Installed terminal sync for {kind:?}"),
+        mgr.install_hook(kind),
+    )?;
     Ok(HookResult {
         sync: mgr.terminal_sync_info(),
         backups: backup.into_iter().collect(),
@@ -137,7 +164,10 @@ pub async fn remove_terminal_hook(
     mgr: State<'_, EnvManager>,
     kind: ShellKind,
 ) -> CmdResult<HookResult> {
-    let backup = mgr.uninstall_hook(kind)?;
+    let backup = logged(
+        format!("Removed terminal sync from {kind:?}"),
+        mgr.uninstall_hook(kind),
+    )?;
     Ok(HookResult {
         sync: mgr.terminal_sync_info(),
         backups: backup.into_iter().collect(),
@@ -153,7 +183,20 @@ pub struct SyncResult {
 
 #[tauri::command]
 pub async fn sync_terminals(mgr: State<'_, EnvManager>) -> CmdResult<SyncResult> {
-    let report = mgr.sync_terminals()?;
+    let report = mgr.sync_terminals();
+    let report = logged(
+        match &report {
+            Ok(r) => format!(
+                "Synced terminals (sync {}, {} pushed, {} removed, {} skipped)",
+                r.generation,
+                r.pushed,
+                r.removed,
+                r.skipped.len()
+            ),
+            Err(_) => "Sync to terminals".to_string(),
+        },
+        report,
+    )?;
     Ok(SyncResult {
         report,
         variables: mgr.list(&[])?,
@@ -164,7 +207,7 @@ pub async fn sync_terminals(mgr: State<'_, EnvManager>) -> CmdResult<SyncResult>
 
 #[tauri::command]
 pub async fn read_env_file(path: PathBuf) -> CmdResult<ParsedEnv> {
-    dotenv::read_file(&path)
+    logged(format!("Read {}", path.display()), dotenv::read_file(&path))
 }
 
 #[tauri::command]
@@ -173,7 +216,11 @@ pub async fn import_variables(
     entries: Vec<EnvEntry>,
     scope: Scope,
 ) -> CmdResult<MutationResult> {
-    let backups = mgr.import_env(&entries, scope)?;
+    let keys: Vec<&str> = entries.iter().map(|e| e.key.as_str()).collect();
+    let backups = logged(
+        format!("Imported {} ({scope:?})", keys.join(", ")),
+        mgr.import_env(&entries, scope),
+    )?;
     Ok(MutationResult {
         variables: mgr.list(&[])?,
         backups,
@@ -186,7 +233,10 @@ pub async fn export_env_file(
     path: PathBuf,
     items: Vec<ExportItem>,
 ) -> CmdResult<ExportReport> {
-    mgr.export_env(&path, &items)
+    logged(
+        format!("Exported {} variable(s) to {}", items.len(), path.display()),
+        mgr.export_env(&path, &items),
+    )
 }
 
 #[derive(Serialize)]
@@ -201,9 +251,35 @@ pub async fn delete_backups(
     mgr: State<'_, EnvManager>,
     ids: Vec<String>,
 ) -> CmdResult<DeleteBackupsResult> {
-    let report = mgr.delete_backups(&ids)?;
+    let report = logged(
+        format!("Deleted backups {}", ids.join(", ")),
+        mgr.delete_backups(&ids),
+    )?;
     Ok(DeleteBackupsResult {
         report,
         backups: mgr.backups()?,
     })
+}
+
+/// Open the folder with the diagnostic logs in the system file manager.
+#[tauri::command]
+pub async fn open_logs_folder() -> CmdResult<PathBuf> {
+    let dir = envcore::paths::logs_dir();
+    let io = |source| Error::Io {
+        path: dir.clone(),
+        source,
+    };
+    std::fs::create_dir_all(&dir).map_err(io)?;
+    let opener = if cfg!(windows) {
+        "explorer"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    std::process::Command::new(opener)
+        .arg(&dir)
+        .spawn()
+        .map_err(io)?;
+    Ok(dir)
 }

@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
@@ -72,6 +73,21 @@ pub struct EnvManager {
     pub(crate) hooks_dir: PathBuf,
     /// Serialises every write so two commands never edit a file at once.
     pub(crate) write_lock: Mutex<()>,
+    /// When the app itself last finished writing (to tell its own changes
+    /// apart from outside ones).
+    last_write: Mutex<Option<Instant>>,
+}
+
+/// Held for the duration of a write; records the time when dropped.
+pub(crate) struct WriteGuard<'a> {
+    _lock: MutexGuard<'a, ()>,
+    last_write: &'a Mutex<Option<Instant>>,
+}
+
+impl Drop for WriteGuard<'_> {
+    fn drop(&mut self) {
+        *lock(self.last_write) = Some(Instant::now());
+    }
 }
 
 pub(crate) fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -120,7 +136,39 @@ impl EnvManager {
             overlay: Mutex::new(BTreeMap::new()),
             stores: Mutex::new(stores),
             write_lock: Mutex::new(()),
+            last_write: Mutex::new(None),
         }
+    }
+
+    pub(crate) fn begin_write(&self) -> WriteGuard<'_> {
+        WriteGuard {
+            _lock: lock(&self.write_lock),
+            last_write: &self.last_write,
+        }
+    }
+
+    /// Did the app itself write within `window`? Watch events right after
+    /// the app's own writes are echoes, not outside changes.
+    pub fn wrote_within(&self, window: Duration) -> bool {
+        lock(&self.last_write).is_some_and(|t| t.elapsed() < window)
+    }
+
+    /// Files whose outside changes should refresh the dashboard: the
+    /// startup files variables are written to, plus every detected shell
+    /// profile (their terminal-sync status is shown).
+    pub fn watch_paths(&self) -> Vec<PathBuf> {
+        let mut paths: Vec<PathBuf> = self
+            .stores()
+            .iter()
+            .filter_map(|s| match s.info() {
+                StoreInfo::ShellFile { path, .. } => Some(path),
+                StoreInfo::Registry { .. } => None,
+            })
+            .collect();
+        paths.extend(shells::detect().into_iter().filter_map(|s| s.config_path));
+        paths.sort();
+        paths.dedup();
+        paths
     }
 
     pub fn platform(&self) -> PlatformInfo {
@@ -175,7 +223,7 @@ impl EnvManager {
     pub fn set(&self, key: &str, value: &str, scope: Scope) -> Result<Vec<BackupOutcome>> {
         validate_key(key)?;
         validate_value(key, value)?;
-        let _guard = lock(&self.write_lock);
+        let _guard = self.begin_write();
         match scope {
             Scope::Process => {
                 lock(&self.overlay).insert(key.to_string(), value.to_string());
@@ -208,7 +256,7 @@ impl EnvManager {
         if entries.is_empty() {
             return Ok(Vec::new());
         }
-        let _guard = lock(&self.write_lock);
+        let _guard = self.begin_write();
         match scope {
             Scope::Process => {
                 let mut overlay = lock(&self.overlay);
@@ -235,7 +283,7 @@ impl EnvManager {
     }
 
     pub fn remove(&self, key: &str, scope: Scope) -> Result<Vec<BackupOutcome>> {
-        let _guard = lock(&self.write_lock);
+        let _guard = self.begin_write();
         match scope {
             Scope::Process => {
                 self.remove_overlay(key);
@@ -297,7 +345,7 @@ impl EnvManager {
                 stores.push(Arc::new(ShellFileStore::new(t.path, syntax)));
             }
         }
-        let _guard = lock(&self.write_lock);
+        let _guard = self.begin_write();
         *lock(&self.stores) = stores;
         Ok(())
     }
@@ -310,7 +358,7 @@ impl EnvManager {
 
     /// Delete backups by id; originals are always kept.
     pub fn delete_backups(&self, ids: &[String]) -> Result<DeleteReport> {
-        let _guard = lock(&self.write_lock);
+        let _guard = self.begin_write();
         self.backups.delete(ids)
     }
 
@@ -359,7 +407,7 @@ impl EnvManager {
     /// Roll back to a backup. Returns the safety backup of the state that
     /// was replaced, so the restore itself can be undone.
     pub fn restore(&self, id: &str) -> Result<BackupOutcome> {
-        let _guard = lock(&self.write_lock);
+        let _guard = self.begin_write();
         let entry = self.backups.get(id)?;
         match entry.target {
             BackupTarget::ShellFile { .. } => self.backups.restore_file(id),

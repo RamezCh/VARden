@@ -9,7 +9,7 @@ import { HELP } from "./lib/helpText";
 import { ShellsView } from "./components/ShellsView";
 import { Toasts } from "./components/Toasts";
 import { VariablesView } from "./components/VariablesView";
-import { syncApi, type EnvVar, type PlatformInfo } from "./lib/api";
+import { api, syncApi, type EnvVar, type PlatformInfo } from "./lib/api";
 import { pickEnvFile, pickExportPath, useFileDrop } from "./lib/files";
 import { formatShort, useEnvironment } from "./lib/useEnvironment";
 import { useToasts } from "./lib/useToasts";
@@ -137,6 +137,14 @@ export default function App() {
               <RefreshIcon />
             </IconButton>
           </div>
+          <button
+            type="button"
+            className="self-start text-xs text-faint underline-offset-4 hover:text-fg hover:underline"
+            title="Diagnostic logs, useful when reporting a problem"
+            onClick={() => api.openLogsFolder().catch((e) => push("error", `Couldn't open the log folder: ${String(e)}`))}
+          >
+            Open log folder
+          </button>
         </div>
       </aside>
 

@@ -82,6 +82,7 @@ export const api = {
   setShellTargets: (targets: ShellTarget[]) => invoke<ShellTarget[]>("set_shell_targets", { targets }),
   listBackups: () => invoke<BackupEntry[]>("list_backups"),
   restoreBackup: (id: string) => invoke<MutationResult>("restore_backup", { id }),
+  openLogsFolder: () => invoke<string>("open_logs_folder"),
   deleteBackups: (ids: string[]) =>
     invoke<{ report: { deleted: number; keptOriginals: number }; backups: BackupEntry[] }>("delete_backups", { ids }),
 };

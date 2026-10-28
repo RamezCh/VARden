@@ -22,5 +22,6 @@ pub mod sync;
 pub mod terminal;
 pub mod transfer;
 pub mod validate;
+pub mod watch;
 
 pub use error::{Error, Result};

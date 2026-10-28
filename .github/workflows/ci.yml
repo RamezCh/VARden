@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Windows, os: windows-latest }
+          - { name: macOS, os: macos-latest }
+          - { name: Linux, os: ubuntu-22.04 }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies and test shells
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf zsh fish
+
+      - name: Install test shells (macOS)
+        if: runner.os == 'macOS'
+        run: brew install fish
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install npm packages
+        run: npm ci
+
+      - name: Frontend tests
+        run: npm test
+
+      - name: Frontend build (type-check + bundle)
+        run: npm run build
+
+      - name: Rust formatting
+        if: runner.os == 'Linux'
+        run: cargo fmt --all --check
+
+      - name: Clippy (warnings are errors)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Rust tests (includes the terminal hook in real shells)
+        run: cargo test --workspace
+
+      - name: Build the app
+        run: npx tauri build --debug --no-bundle

@@ -34,6 +34,11 @@ pub fn sync_dir() -> PathBuf {
     app_data_dir().join("sync")
 }
 
+/// Diagnostic logs (rotated by the app).
+pub fn logs_dir() -> PathBuf {
+    app_data_dir().join("logs")
+}
+
 pub fn legacy_data_dir() -> Option<PathBuf> {
     dirs::data_local_dir().map(|d| d.join(LEGACY_DIR))
 }

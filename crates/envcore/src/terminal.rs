@@ -169,7 +169,7 @@ impl EnvManager {
         section: &[String],
         reason: &str,
     ) -> Result<Option<BackupOutcome>> {
-        let _guard = lock(&self.write_lock);
+        let _guard = self.begin_write();
         let mut file = fsutil::read_text(path)?;
         if !path.exists()
             && path
@@ -240,7 +240,7 @@ impl EnvManager {
     /// They pick the change up before their next prompt.
     pub fn sync_terminals(&self) -> Result<SyncReport> {
         let (desired, skipped) = self.desired()?;
-        let _guard = lock(&self.write_lock);
+        let _guard = self.begin_write();
         let previous = SyncState::load(&self.sync_dir);
         let plan = sync::plan(&desired, &previous, &system_environment(), self.ci);
         self.refresh_hook_scripts()?;
