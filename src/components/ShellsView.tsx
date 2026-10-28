@@ -1,5 +1,7 @@
 import type { DetectedShell, HookStatus, PlatformInfo, ShellKind, ShellTarget, Syntax, TerminalSyncInfo } from "../lib/api";
-import { pickStartupFile } from "../lib/files";
+import { fileName, pickStartupFile } from "../lib/files";
+import { TerminalIcon } from "./icons";
+import { PageHeader } from "./PageHeader";
 import { formatWhen } from "../lib/useEnvironment";
 import { Button } from "./IconButton";
 import { Help } from "./Help";
@@ -49,7 +51,7 @@ function StartupFiles({
         <h2 className="flex items-center gap-2 font-semibold">
           Where variables are saved <Help label="What are startup files?">{HELP.startupFiles}</Help>
         </h2>
-        <Button className="border border-rule" disabled={busy} onClick={() => void add()}>
+        <Button variant="secondary" disabled={busy} onClick={() => void add()}>
           Add startup file…
         </Button>
       </div>
@@ -77,6 +79,30 @@ function StartupFiles({
   );
 }
 
+/** A file path shown as its name, with the folder underneath (full path on hover). */
+function PathField({ label, path, empty, note }: { label: string; path: string | null; empty: string; note?: string }) {
+  const name = path ? fileName(path) : null;
+  const dir = path && name ? path.slice(0, path.length - name.length) : "";
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-muted">{label}</dt>
+      <dd className="selectable min-w-0" title={path ?? undefined}>
+        {path ? (
+          <>
+            <span className="font-mono text-[0.85rem]">{name}</span>
+            {note && <span className="ml-2 text-xs text-faint">({note})</span>}
+            <span className="block truncate text-left font-mono text-xs text-faint" dir="rtl">
+              <bdi>{dir}</bdi>
+            </span>
+          </>
+        ) : (
+          <span className="text-faint">{empty}</span>
+        )}
+      </dd>
+    </div>
+  );
+}
+
 function SyncCell({ hook, busy, onSetHook }: { hook?: HookStatus; busy: boolean; onSetHook: Props["onSetHook"] }) {
   if (!hook) return null;
   if (hook.unsupported) return <p className="text-sm text-muted">{hook.unsupported}</p>;
@@ -89,8 +115,7 @@ function SyncCell({ hook, busy, onSetHook }: { hook?: HookStatus; busy: boolean;
         <Help label="What does installing terminal sync do?">{HELP.hook}</Help>
       </p>
       <Button
-        variant={hook.installed ? "quiet" : "primary"}
-        className={hook.installed ? "border border-rule" : ""}
+        variant={hook.installed ? "secondary" : "primary"}
         disabled={busy}
         onClick={() => onSetHook(hook.kind, hook.name, !hook.installed)}
       >
@@ -114,20 +139,20 @@ export function ShellsView({
   const hookFor = (kind: ShellKind) => sync?.hooks.find((h) => h.kind === kind);
 
   return (
-    <div className="flex max-w-3xl flex-col gap-5">
-      <div>
-        <h1 className="text-xl font-semibold">Shells</h1>
-        <p className="mt-1 max-w-[68ch] text-sm text-muted">
-          {windows
-            ? "Every shell below reads your user environment from the registry, so new terminals always get your saved variables."
-            : "Saved variables are written into a managed block in your login shell's startup file, so new terminals always get them."}{" "}
-          To update terminals that are already open, install terminal sync and use <em>Sync to terminals</em>. Installing adds a
-          short, clearly marked block to the shell's startup file (backed up first). Synced terminals update before their next prompt.
-        </p>
-        {sync?.lastSyncedAt && (
-          <p className="mt-2 text-sm text-muted">Last synced {formatWhen(sync.lastSyncedAt)}.</p>
-        )}
-      </div>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="Shells"
+        help={<Help label="What is terminal sync?">{HELP.sync}</Help>}
+        description={
+          <>
+            {windows
+              ? "Every shell reads your saved variables from your Windows account, so new terminals always get them."
+              : "Saved variables are written into your startup files, so new terminals always get them."}{" "}
+            Install terminal sync to also update terminals that are already open.
+            {sync?.lastSyncedAt && <> Last synced {formatWhen(sync.lastSyncedAt)}.</>}
+          </>
+        }
+      />
 
       {platform?.configurableTargets && (
         <StartupFiles files={startupFiles} busy={busy} onSave={onSaveStartupFiles} onError={onError} />
@@ -136,25 +161,30 @@ export function ShellsView({
       {shells.length === 0 ? (
         <p className="text-sm text-muted">No shells were found on this computer.</p>
       ) : (
-        <ul className="divide-y divide-rule overflow-hidden rounded-lg border border-rule bg-panel">
+        <ul className="grid gap-3 lg:grid-cols-2">
           {shells.map((s) => (
-            <li key={s.kind} className="flex flex-col gap-2 px-4 py-3">
-              <div className="flex items-baseline gap-2">
+            <li key={s.kind} className="flex flex-col gap-3 rounded-lg border border-rule bg-panel px-4 py-3.5">
+              <div className="flex items-center gap-2.5">
+                <TerminalIcon className="shrink-0 text-muted" />
                 <span className="font-semibold">{s.name}</span>
-                {s.isDefault && <span className="text-xs text-synced">{windows ? "Preferred" : "Login shell"}</span>}
+                {s.isDefault && (
+                  <span className="rounded-full bg-synced/15 px-2 py-0.5 text-xs text-synced">
+                    {windows ? "Preferred" : "Login shell"}
+                  </span>
+                )}
               </div>
-              <dl className="grid grid-cols-[100px_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm">
-                <dt className="text-muted">Program</dt>
-                <dd className="truncate font-mono text-[0.85rem]" title={s.executable ?? undefined}>
-                  {s.executable ?? <span className="font-sans text-faint">Not found</span>}
-                </dd>
-                <dt className="text-muted">Startup file</dt>
-                <dd className="truncate font-mono text-[0.85rem]" title={s.configPath ?? undefined}>
-                  {s.configPath ?? <span className="font-sans text-faint">None</span>}
-                  {s.configPath && !s.configExists && <span className="ml-2 font-sans text-faint">(not created yet)</span>}
-                </dd>
+              <dl className="flex flex-col gap-2 text-sm">
+                <PathField label="Program" path={s.executable} empty="Not found" />
+                <PathField
+                  label="Startup file"
+                  path={s.configPath}
+                  empty="None"
+                  note={s.configPath && !s.configExists ? "not created yet" : undefined}
+                />
               </dl>
-              <SyncCell hook={hookFor(s.kind)} busy={busy} onSetHook={onSetHook} />
+              <div className="mt-auto border-t border-rule pt-3">
+                <SyncCell hook={hookFor(s.kind)} busy={busy} onSetHook={onSetHook} />
+              </div>
             </li>
           ))}
         </ul>

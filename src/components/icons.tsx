@@ -101,3 +101,70 @@ export const FolderIcon = (p: P) => (
     <path d="M1.5 4.5a1 1 0 0 1 1-1h3.6l1.5 1.5h5.9a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1Z" />
   </svg>
 );
+export const VariablesIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M5 2.5c-1.4 0-2 .6-2 2v1.8c0 .8-.4 1.2-1.2 1.2.8 0 1.2.4 1.2 1.2v1.8c0 1.4.6 2 2 2M11 2.5c1.4 0 2 .6 2 2v1.8c0 .8.4 1.2 1.2 1.2-.8 0-1.2.4-1.2 1.2v1.8c0 1.4-.6 2-2 2" />
+    <path d="M6.3 6l3.4 4M9.7 6l-3.4 4" />
+  </svg>
+);
+export const ProfilesIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M8 2 14 5 8 8 2 5Z" />
+    <path d="M2 8l6 3 6-3M2 11l6 3 6-3" />
+  </svg>
+);
+export const TerminalIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
+    <path d="M4.5 6.5 6.5 8.5l-2 2M8.5 10.5h3" />
+  </svg>
+);
+export const BackupIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9M2.5 2.5v2.5H5" />
+    <path d="M8 5v3l2 1.5" />
+  </svg>
+);
+export const SunIcon = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="8" cy="8" r="2.75" />
+    <path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1" />
+  </svg>
+);
+export const MoonIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7Z" />
+  </svg>
+);
+export const MonitorIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="1.5" y="2.5" width="13" height="8.5" rx="1.5" />
+    <path d="M5.5 14h5M8 11v3" />
+  </svg>
+);
+export const ChevronDownIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="m4 6 4 4 4-4" />
+  </svg>
+);
+export const ChevronRightIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="m6 4 4 4-4 4" />
+  </svg>
+);
+export const ImportIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M2.5 11.5v1a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1" />
+  </svg>
+);
+export const ExportIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M8 10V2M4.5 5.5 8 2l3.5 3.5M2.5 11.5v1a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1" />
+  </svg>
+);
+export const PathIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M2.5 4h11M2.5 8h11M2.5 12h7" />
+    <circle cx="12.5" cy="12" r="1.2" />
+  </svg>
+);

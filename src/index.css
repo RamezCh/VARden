@@ -26,8 +26,48 @@
   --color-missing: #ec6b6b;
 }
 
+/* Light palette: warm-neutral paper, darker status colours so they keep
+   enough contrast on white. Follows the system unless the user picked a
+   theme (data-theme on <html>). Kept in one block, applied twice. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --color-ink: #f4f5f7;
+    --color-panel: #ffffff;
+    --color-raised: #eceef2;
+    --color-rule: #dcdfe5;
+    --color-fg: #1a1f29;
+    --color-muted: #586273;
+    --color-faint: #8a93a2;
+    --color-synced: #18855a;
+    --color-persistent: #9a6700;
+    --color-process: #2563c9;
+    --color-missing: #c73a3a;
+    --shadow: rgb(15 23 42 / 0.12);
+    --backdrop: rgb(15 23 42 / 0.35);
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --color-ink: #f4f5f7;
+  --color-panel: #ffffff;
+  --color-raised: #eceef2;
+  --color-rule: #dcdfe5;
+  --color-fg: #1a1f29;
+  --color-muted: #586273;
+  --color-faint: #8a93a2;
+  --color-synced: #18855a;
+  --color-persistent: #9a6700;
+  --color-process: #2563c9;
+  --color-missing: #c73a3a;
+  --shadow: rgb(15 23 42 / 0.12);
+  --backdrop: rgb(15 23 42 / 0.35);
+  color-scheme: light;
+}
+
 :root {
   color-scheme: dark;
+  --shadow: rgb(0 0 0 / 0.45);
+  --backdrop: rgb(0 0 0 / 0.6);
 }
 
 html,
@@ -49,6 +89,31 @@ body {
 :focus-visible {
   outline: 2px solid var(--color-process);
   outline-offset: 2px;
+}
+
+/* Feel like a desktop app, not a web page: chrome isn't selectable text,
+   buttons use the normal arrow, and the window never rubber-bands. */
+body {
+  user-select: none;
+  overscroll-behavior: none;
+}
+input,
+textarea,
+.selectable,
+[role="tooltip"] {
+  user-select: text;
+}
+button {
+  cursor: default;
+}
+::selection {
+  background: color-mix(in srgb, var(--color-process) 35%, transparent);
+}
+
+/* Thin scrollbars that match the theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-rule) transparent;
 }
 
 input[type="search"]::-webkit-search-cancel-button {

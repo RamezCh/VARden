@@ -3,6 +3,7 @@ import type { Profile, ProfilesView as ProfilesData, Scope } from "../lib/api";
 import { HELP } from "../lib/helpText";
 import { formatShort, plural } from "../lib/useEnvironment";
 import { Help } from "./Help";
+import { PageHeader } from "./PageHeader";
 import { Button, IconButton } from "./IconButton";
 import { PencilIcon, PlusIcon, TrashIcon } from "./icons";
 
@@ -23,21 +24,17 @@ export function ProfilesView({ data, busy, onNew, onEdit, onDelete, onApply, onT
   const { profiles, active } = data;
 
   return (
-    <div className="flex max-w-3xl flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-semibold">
-            Profiles <Help label="What are profiles?">{HELP.profiles}</Help>
-          </h1>
-          <p className="mt-1 max-w-[62ch] text-sm text-muted">
-            Named sets of variables, for example one per client or project. Applying one switches them all at once;
-            turning it off puts the previous values back.
-          </p>
-        </div>
-        <Button variant="primary" onClick={onNew}>
-          <PlusIcon /> New profile
-        </Button>
-      </div>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="Profiles"
+        help={<Help label="What are profiles?">{HELP.profiles}</Help>}
+        description="Named sets of variables, for example one per client or project. Applying one switches them all at once; turning it off puts the previous values back."
+        actions={
+          <Button variant="primary" onClick={onNew}>
+            <PlusIcon /> New profile
+          </Button>
+        }
+      />
 
       {active && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-process/40 bg-process/[0.07] px-4 py-3">
@@ -58,7 +55,7 @@ export function ProfilesView({ data, busy, onNew, onEdit, onDelete, onApply, onT
               Re-apply
             </Button>
           )}
-          <Button className="border border-rule" disabled={busy} onClick={() => onTurnOff(active.name)}>
+          <Button variant="secondary" disabled={busy} onClick={() => onTurnOff(active.name)}>
             Turn off
           </Button>
         </div>
@@ -106,7 +103,7 @@ export function ProfilesView({ data, busy, onNew, onEdit, onDelete, onApply, onT
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-1">
                     {isActive ? (
-                      <Button className="border border-rule" disabled={busy} onClick={() => onTurnOff(p.name)}>
+                      <Button variant="secondary" disabled={busy} onClick={() => onTurnOff(p.name)}>
                         Turn off
                       </Button>
                     ) : (
@@ -120,7 +117,7 @@ export function ProfilesView({ data, busy, onNew, onEdit, onDelete, onApply, onT
                           Apply
                         </Button>
                         <Button
-                          className="border border-rule"
+                          variant="secondary"
                           disabled={busy}
                           onClick={() => onApply(p, "process")}
                           title="Only for open terminals, after Sync; nothing is saved"

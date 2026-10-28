@@ -243,10 +243,10 @@ export function PathEditor({ windows, busy, onClose, onSave }: Props) {
                   }
                 }}
               />
-              <Button className="border border-rule" onClick={() => void browse()}>
+              <Button variant="secondary" onClick={() => void browse()}>
                 <FolderIcon /> Browse…
               </Button>
-              <Button className="border border-rule" disabled={draft.trim() === ""} onClick={() => add(draft)}>
+              <Button variant="secondary" disabled={draft.trim() === ""} onClick={() => add(draft)}>
                 <PlusIcon /> Add
               </Button>
             </div>

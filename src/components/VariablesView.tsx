@@ -1,9 +1,11 @@
-import { useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import type { ExportItem } from "../lib/api";
 import type { ActiveProfile, EnvVar, Scope, Status } from "../lib/api";
 import { countByStatus, filterVars, rowId, sortVars, type ScopeFilter, type SortKey, type SortState } from "../lib/filter";
 import { Button } from "./IconButton";
-import { EyeIcon, EyeOffIcon, PlusIcon, SearchIcon, SyncIcon } from "./icons";
+import { ExportIcon, EyeIcon, EyeOffIcon, ImportIcon, PathIcon, PlusIcon, SearchIcon, SyncIcon, TrashIcon } from "./icons";
+import { Menu } from "./Menu";
+import { PageHeader } from "./PageHeader";
 import { StatusStrip } from "./StatusStrip";
 import { Help } from "./Help";
 import { HELP } from "../lib/helpText";
@@ -105,6 +107,28 @@ export function VariablesView({
     if (await onDeleteMany(picked.map(({ key, scope }) => ({ key, scope })))) clearSelection();
   };
 
+  // Ctrl+A selects what's shown, Del asks to delete the selection, Esc clears it.
+  const keys = useRef({ rows, picked: picked.length });
+  keys.current = { rows, picked: picked.length };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (document.querySelector("dialog[open]") || t?.closest("input, textarea, select, [role=menu]")) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        setSelected(new Set(keys.current.rows.map(rowId)));
+      } else if (e.key === "Delete" && keys.current.picked > 0) {
+        e.preventDefault();
+        setConfirmBulk(true);
+      } else if (e.key === "Escape" && keys.current.picked > 0) {
+        setSelected(new Set());
+        setConfirmBulk(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const toggleStatus = (s: Status) =>
     setStatuses((prev) => {
       const next = new Set(prev);
@@ -140,59 +164,67 @@ export function VariablesView({
     </div>
   );
 
+  const syncButton =
+    hooksInstalled > 0 ? (
+      <Button
+        variant="secondary"
+        onClick={onSync}
+        disabled={busy}
+        title="Push saved and temporary variables into open terminals that have terminal sync"
+      >
+        <SyncIcon />
+        Sync to terminals
+        {pending > 0 && (
+          <span
+            className="ml-0.5 rounded-full bg-persistent/20 px-1.5 font-mono text-xs text-persistent"
+            title={`${pending} change${pending === 1 ? "" : "s"} not in open terminals yet`}
+          >
+            {pending}
+          </span>
+        )}
+      </Button>
+    ) : (
+      <Button variant="secondary" onClick={onSetUpSync} title="Install the terminal hook for your shells">
+        <SyncIcon />
+        Set up terminal sync
+      </Button>
+    );
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold">Variables</h1>
-          <p className="mt-1 text-sm text-muted">Your saved user variables, plus temporary ones for open terminals.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={onEditPath} title="Add, remove or reorder the folders in your PATH">
-            Edit PATH
-          </Button>
-          <Button onClick={onOpenImport}>Import .env</Button>
-          <Button onClick={() => onOpenExport(rows)} disabled={vars.length === 0}>
-            Export .env
-          </Button>
-          {hooksInstalled > 0 ? (
-            <>
-            <Button
-              className="border border-rule"
-              onClick={onSync}
-              disabled={busy}
-              title="Push saved variables into open terminals that have terminal sync"
-            >
-              <SyncIcon />
-              Sync to terminals
-              {pending > 0 && (
-                <span
-                  className="ml-0.5 rounded-full bg-persistent/20 px-1.5 font-mono text-xs text-persistent"
-                  title={`${pending} change${pending === 1 ? "" : "s"} not in open terminals yet`}
-                >
-                  {pending}
-                </span>
-              )}
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="Variables"
+        description="Your saved user variables, plus temporary ones for open terminals."
+        actions={
+          <>
+            <Button variant="secondary" onClick={onEditPath} title="Add, remove or reorder the folders in your PATH">
+              <PathIcon /> Edit PATH
             </Button>
-            <Help label="What does Sync to terminals do?">{HELP.sync}</Help>
-            </>
-          ) : (
-            <>
-            <Button className="border border-rule" onClick={onSetUpSync} title="Install the terminal hook for your shells">
-              <SyncIcon />
-              Set up terminal sync
+            <Menu
+              label=".env"
+              items={[
+                { label: "Import from .env…", icon: <ImportIcon />, onSelect: onOpenImport },
+                {
+                  label: "Export to .env…",
+                  icon: <ExportIcon />,
+                  disabled: vars.length === 0,
+                  onSelect: () => onOpenExport(rows),
+                },
+              ]}
+            />
+            <span className="flex items-center gap-1.5">
+              {syncButton}
+              <Help label={hooksInstalled > 0 ? "What does Sync to terminals do?" : "What is terminal sync?"}>{HELP.sync}</Help>
+            </span>
+            <Button variant="primary" onClick={() => setCreating(true)} disabled={creating} title="New variable (Ctrl+N)">
+              <PlusIcon /> New variable
             </Button>
-            <Help label="What is terminal sync?">{HELP.sync}</Help>
-            </>
-          )}
-          <Button variant="primary" onClick={() => setCreating(true)} disabled={creating} title="New variable (N)">
-            <PlusIcon /> New variable
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {activeProfile && (
-        <p className="-mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
+        <p className="-mt-1 flex flex-wrap items-center gap-2 text-sm text-muted">
           <span className="h-2 w-2 rounded-full bg-process" />
           <span>
             Profile <strong className="text-fg">{activeProfile.name}</strong> is active
@@ -204,59 +236,77 @@ export function VariablesView({
         </p>
       )}
 
-      <StatusStrip counts={counts} active={statuses} onToggle={toggleStatus} onClear={() => setStatuses(new Set())} />
-
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="relative flex min-w-56 flex-1 items-center">
-          <SearchIcon className="pointer-events-none absolute left-2.5 text-faint" />
-          <span className="sr-only">Search variables</span>
-          <input
-            ref={searchRef}
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Escape" && setQuery("")}
-            placeholder="Search names and visible values"
-            className="h-9 w-full rounded-md border border-rule bg-panel pl-8 pr-10 text-sm text-fg placeholder:text-faint focus:border-process focus:outline-none"
-          />
-          <kbd className="pointer-events-none absolute right-2.5 rounded border border-rule px-1.5 font-mono text-[0.7rem] text-faint">/</kbd>
-        </label>
-
-        <div role="radiogroup" aria-label="Scope" className="flex h-9 items-center rounded-md border border-rule bg-panel p-0.5">
-          {SCOPES.map((s) => (
-            <button
-              key={s.value}
-              type="button"
-              role="radio"
-              aria-checked={scope === s.value}
-              onClick={() => setScope(s.value)}
-              className={`h-full rounded px-3 text-sm transition-colors ${
-                scope === s.value ? "bg-raised text-fg" : "text-muted hover:text-fg"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
+      <div className="flex flex-col gap-2.5">
+        <div className="flex items-center gap-2">
+          <label className="relative flex min-w-0 flex-1 items-center">
+            <SearchIcon className="pointer-events-none absolute left-2.5 text-faint" />
+            <span className="sr-only">Search variables</span>
+            <input
+              ref={searchRef}
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Escape" && setQuery("")}
+              placeholder="Search names and visible values"
+              className="h-9 w-full rounded-md border border-rule bg-panel pl-8 pr-16 text-sm text-fg placeholder:text-faint focus:border-process focus:outline-none"
+            />
+            <kbd className="pointer-events-none absolute right-2.5 rounded border border-rule px-1.5 font-sans text-[0.7rem] text-faint">
+              Ctrl F
+            </kbd>
+          </label>
+          <Button
+            variant="secondary"
+            className="h-9"
+            aria-pressed={revealAll}
+            onClick={() => {
+              setRevealAll(!revealAll);
+              setRevealed(new Set());
+            }}
+          >
+            {revealAll ? <EyeOffIcon /> : <EyeIcon />}
+            {revealAll ? "Hide secrets" : "Show secrets"}
+          </Button>
         </div>
 
-        <Button
-          className="h-9 border border-rule"
-          aria-pressed={revealAll}
-          onClick={() => {
-            setRevealAll(!revealAll);
-            setRevealed(new Set());
-          }}
-        >
-          {revealAll ? <EyeOffIcon /> : <EyeIcon />}
-          {revealAll ? "Hide secrets" : "Show secrets"}
-        </Button>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div role="radiogroup" aria-label="Scope" className="flex h-8 items-center rounded-md border border-rule bg-panel p-0.5">
+            {SCOPES.map((s) => (
+              <button
+                key={s.value}
+                type="button"
+                role="radio"
+                aria-checked={scope === s.value}
+                onClick={() => setScope(s.value)}
+                className={`h-full rounded px-3 text-sm transition-colors ${
+                  scope === s.value ? "bg-raised font-semibold text-fg" : "text-muted hover:text-fg"
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <span className="h-5 w-px bg-rule" aria-hidden />
+          <StatusStrip counts={counts} active={statuses} onToggle={toggleStatus} onClear={() => setStatuses(new Set())} />
+          <span className="ml-auto text-sm text-muted">
+            {filtered ? (
+              <>
+                {rows.length} of {vars.length}{" "}
+                <button type="button" onClick={clearFilters} className="underline underline-offset-4 hover:text-fg">
+                  Clear filters
+                </button>
+              </>
+            ) : (
+              `${vars.length} variable${vars.length === 1 ? "" : "s"}`
+            )}
+          </span>
+        </div>
       </div>
 
       {picked.length > 0 && (
         <div
           role="region"
           aria-label="Selected variables"
-          className={`-mb-3 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+          className={`-mb-2 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-1.5 text-sm ${
             confirmBulk ? "border-missing/40 bg-missing/[0.07]" : "border-process/40 bg-process/[0.07]"
           }`}
           onKeyDown={(e) => e.key === "Escape" && setConfirmBulk(false)}
@@ -279,11 +329,15 @@ export function VariablesView({
           ) : (
             <>
               <span className="mr-auto font-semibold">{picked.length} selected</span>
-              <Button onClick={() => onOpenExport(picked)}>Export…</Button>
-              <Button className="hover:text-missing" onClick={() => setConfirmBulk(true)}>
-                Delete…
+              <Button onClick={() => onOpenExport(picked)}>
+                <ExportIcon /> Export…
               </Button>
-              <Button onClick={clearSelection}>Clear selection</Button>
+              <Button className="hover:text-missing" onClick={() => setConfirmBulk(true)} title="Delete (Del)">
+                <TrashIcon /> Delete…
+              </Button>
+              <Button onClick={clearSelection} title="Clear selection (Esc)">
+                Clear
+              </Button>
             </>
           )}
         </div>
@@ -324,14 +378,6 @@ export function VariablesView({
         empty={empty}
       />
 
-      {rows.length > 0 && filtered && (
-        <p className="-mt-3 text-sm text-muted">
-          Showing {rows.length} of {vars.length}.{" "}
-          <button type="button" onClick={clearFilters} className="underline underline-offset-4 hover:text-fg">
-            Clear filters
-          </button>
-        </p>
-      )}
     </div>
   );
 }

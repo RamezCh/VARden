@@ -20,8 +20,9 @@ export function IconButton({ label, children, className = "", ...rest }: Props) 
 }
 
 const variants = {
-  primary: "bg-fg text-ink hover:bg-white",
+  primary: "bg-fg text-ink hover:opacity-90",
   quiet: "text-muted hover:bg-raised hover:text-fg",
+  secondary: "border border-rule text-fg hover:bg-raised",
   danger: "bg-missing/15 text-missing hover:bg-missing/25",
 };
 

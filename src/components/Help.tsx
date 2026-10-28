@@ -72,7 +72,7 @@ export function Help({ label, children }: Props) {
           id={id}
           role="tooltip"
           style={{ top: pos.top, left: pos.left, width: WIDTH }}
-          className="fixed z-[60] rounded-lg border border-rule bg-raised px-3.5 py-3 text-left text-sm font-normal normal-case leading-relaxed tracking-normal text-fg shadow-xl shadow-black/40 [&_p+p]:mt-2"
+          className="fixed z-[60] rounded-lg border border-rule bg-raised px-3.5 py-3 text-left text-sm font-normal normal-case leading-relaxed tracking-normal text-fg shadow-xl shadow-[var(--shadow)] [&_p+p]:mt-2"
         >
           {children}
         </div>

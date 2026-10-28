@@ -106,6 +106,14 @@ See [ROADMAP.md](ROADMAP.md) for what comes next.
 - **Bulk select.** Checkboxes on every row, plus one that selects everything shown. Selected variables can be exported or deleted together, with one backup per store.
 - **Recent export folders.** The export dialog lists the last five folders you exported to; clicking one opens the save dialog there. Stored in `settings.json`; folders that no longer exist are skipped.
 
+## Interface polish
+
+- **Light and dark themes.** VARden follows the system theme; the sidebar's Theme switch can pin it to light or dark, and the native title bar follows the choice.
+- **Desktop behaviour.** The window reopens at its last size and position. Shortcuts: Ctrl+1–4 switch pages, Ctrl+F or `/` searches, Ctrl+N or `N` adds a variable, F5 re-reads everything, and in the table Ctrl+A selects what's shown, Del deletes the selection and Esc clears it. Double-click a row to edit it. Interface text isn't selectable and the browser's context menu, reload and print shortcuts are off, but values, paths and inputs can still be selected and copied.
+- **Readable long values.** Long values, path lists and `%VAR%` values open under their row: lists one entry per line with missing folders marked, other values wrapped in full, each with a Copy button.
+- **Calmer layout.** One header style on every page, the same width everywhere, grouped actions (Edit PATH, a `.env` menu, Sync, New variable), compact status filters instead of the coloured bar, row actions that appear on hover, sidebar icons, and shell cards that show a file's name with its folder underneath.
+- **Fix:** a value that is a folder followed by a separator (JetBrains installers write `IntelliJ IDEA` = `C:\...\bin;` and add `%IntelliJ IDEA%` to PATH) is no longer flagged as missing.
+
 ## Renamed to VARden
 
 Earlier builds were called *Environment Manager*. On first start, VARden moves their data (backups including originals, sync state, hook scripts) from `%LOCALAPPDATA%\EnvManager` into `%LOCALAPPDATA%\VARden` and removes the old folder. Blocks in startup files written with the old `ENVMANAGER` markers are still recognised and are rewritten with `VARDEN` markers on the next change. Installed terminal-sync hooks are updated to the new location right away, with a backup first.

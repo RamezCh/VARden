@@ -270,17 +270,29 @@ fn inspect(
         .map(|value| {
             let expanded = expand_entry(value, lookup);
             let target = expanded.clone().unwrap_or_else(|| value.clone());
-            let absolute = Path::new(&target).is_absolute()
-                && !target.starts_with("\\\\")
-                && !target.starts_with("//");
-            let checked = expanded.is_some() && absolute;
-            let key = normalise(&target);
-            let duplicate = seen.contains(&key);
-            seen.push(key);
+            // `%IntelliJ IDEA%` expands to `C:\...\bin;`: a variable can
+            // splice in one or more folders, each ending in a separator.
+            let parts: Vec<&str> = target
+                .split(sep())
+                .map(str::trim)
+                .filter(|p| !p.is_empty())
+                .collect();
+            let absolute = |p: &str| {
+                Path::new(p).is_absolute() && !p.starts_with("\\\\") && !p.starts_with("//")
+            };
+            let checked =
+                expanded.is_some() && !parts.is_empty() && parts.iter().all(|p| absolute(p));
+            let mut duplicate = false;
+            for p in &parts {
+                let key = normalise(p);
+                duplicate |= seen.contains(&key);
+                seen.push(key);
+            }
+            let missing = checked && parts.iter().any(|p| !exists(Path::new(p)));
             PathEntry {
                 expanded: expanded.filter(|e| e != value),
                 checked,
-                missing: checked && !exists(Path::new(&target)),
+                missing,
                 duplicate,
                 value: value.clone(),
             }
@@ -573,5 +585,10 @@ mod tests {
         assert!(!m[2].checked && !m[2].missing);
         // The system copy comes after yours, so it is the duplicate.
         assert!(b[0].duplicate);
+
+        // A trailing separator (from a spliced-in variable) isn't part of the folder.
+        let spliced = vec![format!("{real}{}", sep())];
+        let (m, _) = inspect_all(&spliced, 0, &[], &lookup, &|p| p.exists());
+        assert!(m[0].checked && !m[0].missing, "{:?}", m[0]);
     }
 }

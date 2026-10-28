@@ -34,7 +34,7 @@ export function Modal({ open, onClose, title, description, children, footer }: P
         onClose();
       }}
       aria-labelledby="modal-title"
-      className="m-auto w-[min(720px,calc(100vw-2rem))] rounded-xl border border-rule bg-panel p-0 text-fg shadow-2xl shadow-black/50 backdrop:bg-black/60"
+      className="m-auto w-[min(720px,calc(100vw-2rem))] rounded-xl border border-rule bg-panel p-0 text-fg shadow-2xl shadow-[var(--shadow)] backdrop:bg-[var(--backdrop)]"
     >
       {open && (
         <div className="flex max-h-[min(720px,calc(100vh-4rem))] flex-col">

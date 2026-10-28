@@ -15,7 +15,7 @@ export function Toasts({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id:
         <div
           key={t.id}
           role={t.kind === "error" ? "alert" : "status"}
-          className="toast-in pointer-events-auto flex items-start gap-3 overflow-hidden rounded-lg border border-rule bg-raised py-2.5 pl-0 pr-2 text-sm shadow-lg shadow-black/30"
+          className="toast-in pointer-events-auto flex items-start gap-3 overflow-hidden rounded-lg border border-rule bg-raised py-2.5 pl-0 pr-2 text-sm shadow-lg shadow-[var(--shadow)]"
         >
           <span className={`w-1 self-stretch ${BAR[t.kind]}`} />
           <p className="flex-1 py-0.5">{t.text}</p>

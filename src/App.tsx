@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { BackupsView } from "./components/BackupsView";
 import { ExportModal } from "./components/ExportModal";
 import { ImportModal, type ImportSource } from "./components/ImportModal";
-import { RefreshIcon } from "./components/icons";
+import { BackupIcon, ProfilesIcon, RefreshIcon, TerminalIcon, VariablesIcon } from "./components/icons";
 import { IconButton } from "./components/IconButton";
 import { Help } from "./components/Help";
 import { HELP } from "./lib/helpText";
@@ -13,11 +13,19 @@ import { api, syncApi, type EnvVar, type PlatformInfo, type Profile } from "./li
 import { ProfileEditor } from "./components/ProfileEditor";
 import { PathEditor } from "./components/PathEditor";
 import { ProfilesView } from "./components/ProfilesView";
-import { pickEnvFile, pickExportPath, useFileDrop } from "./lib/files";
+import { fileName, pickEnvFile, pickExportPath, useFileDrop } from "./lib/files";
+import { useTheme } from "./lib/theme";
+import { ThemeSwitch } from "./components/ThemeSwitch";
 import { formatShort, useEnvironment } from "./lib/useEnvironment";
 import { useToasts } from "./lib/useToasts";
 
 type View = "variables" | "profiles" | "shells" | "backups";
+
+/** Short, human name for where variables are saved; the full path is the tooltip. */
+function storeShort(p: PlatformInfo | null): string {
+  if (!p) return "…";
+  return p.stores.map((s) => (s.type === "registry" ? "Your Windows account" : fileName(s.path))).join(", ");
+}
 
 function storeDescription(p: PlatformInfo | null): string {
   if (!p) return "";
@@ -34,6 +42,7 @@ export default function App() {
   const [view, setView] = useState<View>("variables");
   const openBackups = useCallback(() => setView("backups"), []);
   const env = useEnvironment(push, openBackups);
+  const theme = useTheme();
   const [creating, setCreating] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -68,36 +77,67 @@ export default function App() {
 
   const hooksInstalled = env.sync?.hooks.filter((h) => h.installed).length ?? 0;
 
-  // "/" focuses search, "N" starts a new variable.
+  // Desktop shortcuts: Ctrl+1–4 switch pages, Ctrl+F or "/" searches,
+  // Ctrl+N or "N" adds a variable, F5 re-reads everything from disk.
+  const refreshRef = useRef(env.refresh);
+  refreshRef.current = env.refresh;
   useEffect(() => {
+    const views: View[] = ["variables", "profiles", "shells", "backups"];
+    const search = () => {
+      setView("variables");
+      window.setTimeout(() => searchRef.current?.focus());
+    };
+    const create = () => {
+      setView("variables");
+      setCreating(true);
+    };
     const onKey = (e: KeyboardEvent) => {
+      if (document.querySelector("dialog[open]")) return;
+      const mod = e.ctrlKey || e.metaKey;
+      if (e.key === "F5") {
+        e.preventDefault();
+        void refreshRef.current();
+        return;
+      }
+      if (mod && !e.altKey && !e.shiftKey) {
+        const n = Number(e.key);
+        if (n >= 1 && n <= views.length) {
+          e.preventDefault();
+          setView(views[n - 1]);
+        } else if (e.key.toLowerCase() === "f") {
+          e.preventDefault();
+          search();
+        } else if (e.key.toLowerCase() === "n") {
+          e.preventDefault();
+          create();
+        }
+        return;
+      }
       if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
       if (e.key === "/") {
         e.preventDefault();
-        setView("variables");
-        window.setTimeout(() => searchRef.current?.focus());
+        search();
       } else if (e.key.toLowerCase() === "n") {
         e.preventDefault();
-        setView("variables");
-        setCreating(true);
+        create();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const nav: { id: View; label: string; count: number }[] = [
-    { id: "variables", label: "Variables", count: env.vars.length },
-    { id: "profiles", label: "Profiles", count: env.profiles.profiles.length },
-    { id: "shells", label: "Shells", count: env.shells.length },
-    { id: "backups", label: "Backups", count: env.backups.length },
+  const nav: { id: View; label: string; count: number; icon: ReactNode; shortcut: string }[] = [
+    { id: "variables", label: "Variables", count: env.vars.length, icon: <VariablesIcon />, shortcut: "1" },
+    { id: "profiles", label: "Profiles", count: env.profiles.profiles.length, icon: <ProfilesIcon />, shortcut: "2" },
+    { id: "shells", label: "Shells", count: env.shells.length, icon: <TerminalIcon />, shortcut: "3" },
+    { id: "backups", label: "Backups", count: env.backups.length, icon: <BackupIcon />, shortcut: "4" },
   ];
 
   return (
     <div className="flex h-screen min-h-0">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-rule bg-panel/60 px-3 py-5">
-        <div className="flex items-center gap-2.5 px-2">
-          <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden>
+      <aside className="flex w-56 shrink-0 flex-col border-r border-rule bg-panel/70 px-3 pb-4 pt-5">
+        <div className="flex items-center gap-2.5 px-2.5">
+          <svg width="24" height="24" viewBox="0 0 22 22" aria-hidden>
             <rect x="1" y="1" width="20" height="20" rx="6" fill="var(--color-raised)" stroke="var(--color-rule)" />
             <circle cx="7" cy="14" r="2" fill="var(--color-synced)" />
             <circle cx="11" cy="14" r="2" fill="var(--color-persistent)" />
@@ -106,46 +146,54 @@ export default function App() {
           <span className="text-lg font-semibold leading-tight tracking-tight">VARden</span>
         </div>
 
-        <nav aria-label="Sections" className="mt-7 flex flex-col gap-0.5">
-          {nav.map((n) => (
-            <button
-              key={n.id}
-              type="button"
-              aria-current={view === n.id ? "page" : undefined}
-              onClick={() => setView(n.id)}
-              className={`flex items-center justify-between rounded-md px-2.5 py-2 text-left text-[0.95rem] transition-colors ${
-                view === n.id ? "bg-raised text-fg" : "text-muted hover:bg-raised/60 hover:text-fg"
-              }`}
-            >
-              {n.label}
-              <span className="font-mono text-xs tabular-nums text-faint">{n.count}</span>
-            </button>
-          ))}
+        <nav aria-label="Sections" className="mt-6 flex flex-col gap-0.5">
+          {nav.map((n) => {
+            const current = view === n.id;
+            return (
+              <button
+                key={n.id}
+                type="button"
+                aria-current={current ? "page" : undefined}
+                onClick={() => setView(n.id)}
+                title={`${n.label} (Ctrl+${n.shortcut})`}
+                className={`relative flex items-center gap-2.5 rounded-md px-2.5 py-[0.45rem] text-left text-[0.95rem] transition-colors ${
+                  current ? "bg-raised font-semibold text-fg" : "text-muted hover:bg-raised/60 hover:text-fg"
+                }`}
+              >
+                {current && <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-process" aria-hidden />}
+                <span className={current ? "text-process" : ""}>{n.icon}</span>
+                <span className="flex-1">{n.label}</span>
+                <span className="font-mono text-xs font-normal tabular-nums text-faint">{n.count}</span>
+              </button>
+            );
+          })}
         </nav>
 
-        <div className="mt-auto flex flex-col gap-2 px-2">
-          <p className="flex items-center gap-1.5 text-xs text-muted">
-            Saving to <Help label="Where are variables saved?">{HELP.store}</Help>
-          </p>
-          <p className="whitespace-pre-line font-mono text-xs leading-relaxed text-fg/80">
-            {/* Allow line breaks only after path separators (zero-width space). */}
-            {storeDescription(env.platform).replace(/([\\/])/g, "$1\u200B")}
-          </p>
-          <div className="mt-1 flex items-center justify-between gap-2">
-            <span className="text-xs text-faint">
-              {env.loading
-                ? "Reading…"
-                : env.sync?.lastSyncedAt
-                  ? `Terminals synced ${formatShort(env.sync.lastSyncedAt)}`
-                  : "Up to date"}
-            </span>
-            <IconButton label="Reload from disk" onClick={() => void env.refresh()} disabled={env.loading}>
-              <RefreshIcon />
-            </IconButton>
+        <div className="mt-auto flex flex-col gap-3">
+          <div className="rounded-lg border border-rule bg-ink/50 px-3 py-2.5">
+            <p className="flex items-center gap-1.5 text-xs text-muted">
+              Saving to <Help label="Where are variables saved?">{HELP.store}</Help>
+            </p>
+            <p className="mt-0.5 truncate text-sm" title={storeDescription(env.platform)}>
+              {storeShort(env.platform)}
+            </p>
+            <div className="mt-2 flex items-center justify-between gap-2 border-t border-rule pt-2">
+              <span className="truncate text-xs text-muted">
+                {env.loading
+                  ? "Reading…"
+                  : env.sync?.lastSyncedAt
+                    ? `Terminals synced ${formatShort(env.sync.lastSyncedAt)}`
+                    : "Up to date"}
+              </span>
+              <IconButton label="Reload from disk (F5)" onClick={() => void env.refresh()} disabled={env.loading}>
+                <RefreshIcon />
+              </IconButton>
+            </div>
           </div>
+          <ThemeSwitch pref={theme.pref} onChange={theme.choose} />
           <button
             type="button"
-            className="self-start text-xs text-faint underline-offset-4 hover:text-fg hover:underline"
+            className="self-start px-1 text-xs text-faint underline-offset-4 hover:text-fg hover:underline"
             title="Diagnostic logs, useful when reporting a problem"
             onClick={() => api.openLogsFolder().catch((e) => push("error", `Couldn't open the log folder: ${String(e)}`))}
           >

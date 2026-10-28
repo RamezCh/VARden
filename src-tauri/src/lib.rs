@@ -85,6 +85,8 @@ pub fn run() {
         }))
         .plugin(log_plugin())
         .plugin(tauri_plugin_dialog::init())
+        // Reopen at the size and place the window was closed at.
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .setup(|app| {
             log_panics();
             log::info!(

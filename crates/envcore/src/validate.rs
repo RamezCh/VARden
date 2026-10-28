@@ -128,8 +128,18 @@ pub fn check_paths(key: &str, value: &str, sep: char, home: Option<&std::path::P
     if value.is_empty() || value.contains("://") || value.contains('\n') {
         return PathCheck::default();
     }
-    let is_list =
-        PATH_LISTS.contains(&upper.as_str()) || (upper.ends_with("PATH") && value.contains(sep));
+    // Installers sometimes write a single folder with a trailing separator
+    // (JetBrains: `IntelliJ IDEA` = `C:\...\bin;`), meant to be spliced
+    // into PATH. Any value whose parts are all absolute paths is a list.
+    let all_paths = value.contains(sep)
+        && value
+            .split(sep)
+            .map(str::trim)
+            .filter(|p| !p.is_empty())
+            .all(|p| is_absolute_path(p.trim_matches('"')));
+    let is_list = PATH_LISTS.contains(&upper.as_str())
+        || (upper.ends_with("PATH") && value.contains(sep))
+        || all_paths;
     let entries: Vec<&str> = if is_list {
         value.split(sep).collect()
     } else {
@@ -252,6 +262,15 @@ mod tests {
         ] {
             assert_eq!(check_paths("ANY", v, sep, home).checked, 0, "{v}");
         }
+        // A folder with a trailing separator (JetBrains' `IntelliJ IDEA`
+        // variable) is the folder, not a missing path ending in ';'.
+        assert_eq!(
+            check_paths("IntelliJ IDEA", &format!("{ok}{sep}"), sep, home),
+            PathCheck {
+                checked: 1,
+                missing: vec![]
+            }
+        );
         // A custom *_PATH variable holding a list is split too.
         assert_eq!(
             check_paths("MY_TOOLS_PATH", &format!("{ok}{sep}{gone}"), sep, home).checked,

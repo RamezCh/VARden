@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import type { EnvVar, Scope } from "../lib/api";
 import { keyError, looksSensitive, rowId, type SortKey, type SortState } from "../lib/filter";
 import { Button, IconButton } from "./IconButton";
-import { EyeIcon, EyeOffIcon, PencilIcon, SortIcon, TrashIcon } from "./icons";
+import { CheckIcon, ChevronRightIcon, CopyIcon, EyeIcon, EyeOffIcon, PencilIcon, SortIcon, TrashIcon } from "./icons";
 import { SecretValue } from "./SecretValue";
 import { StatusPill } from "./StatusStrip";
 import { Help } from "./Help";
@@ -105,7 +105,7 @@ export function VariableTable(props: TableProps) {
           <SelectAll rows={rows} selected={props.selected} onToggleAll={props.onToggleAll} />
           {header("Name", "key", "")}
         </div>
-        {header("Value", null, "")}
+        {header("Value", null, "pl-[1.375rem]")}
         <div className="flex items-center gap-1.5">
           {header("Scope", "scope", "")}
           <Help label="What does scope mean?">{HELP.scope}</Help>
@@ -149,29 +149,93 @@ export function VariableTable(props: TableProps) {
   );
 }
 
-/** Paths in the value that don't exist (what makes the row 🔴). */
-function PathProblems({ v, hidden }: { v: EnvVar; hidden: boolean }) {
-  if (hidden) return <p className="mt-0.5 text-xs text-missing">Points to a path that doesn't exist.</p>;
-  if (v.checkedPaths <= 1) {
-    return (
-      <p className="mt-0.5 truncate text-xs text-missing" title={v.missingPaths[0]}>
-        Doesn't exist: <span className="font-mono">{v.missingPaths[0]}</span>
-      </p>
-    );
-  }
+/** A list of folders (PATH-like), split into entries. */
+function listEntries(v: EnvVar, sep: string): string[] | null {
+  if (v.kind === "expression") return null;
+  const value = v.expanded ?? v.value;
+  if (!value.includes(sep)) return null;
+  const parts = value.split(sep).map((p) => p.trim()).filter(Boolean);
+  const listy = v.checkedPaths > 1 || /PATH$/i.test(v.key);
+  return listy && parts.length > 0 ? parts : null;
+}
+
+/** Long values and lists can be opened to read them in full. */
+const isLong = (v: EnvVar, sep: string) =>
+  v.value.length > 48 || Boolean(v.expanded) || listEntries(v, sep) !== null || v.missingPaths.length > 0;
+
+function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
   return (
-    <details className="mt-0.5 text-xs">
-      <summary className="cursor-pointer text-missing">
-        {v.missingPaths.length} of {v.checkedPaths} entries don't exist
-      </summary>
-      <ul className="mt-1 space-y-0.5 border-l border-missing/40 pl-2">
-        {v.missingPaths.map((p) => (
-          <li key={p} className="truncate font-mono text-muted" title={p}>
-            {p}
-          </li>
-        ))}
-      </ul>
-    </details>
+    <Button
+      variant="quiet"
+      className="h-7 px-2 text-xs"
+      onClick={async () => {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1400);
+      }}
+    >
+      {copied ? <CheckIcon className="text-synced" /> : <CopyIcon />}
+      {copied ? "Copied" : label}
+    </Button>
+  );
+}
+
+/** The full value, opened under the row: wrapped text, or one entry per line. */
+function ValueDetails({ v, sep }: { v: EnvVar; sep: string }) {
+  const entries = listEntries(v, sep);
+  const missing = new Set(v.missingPaths);
+  return (
+    <div role="cell" className="order-last col-span-full mt-2 rounded-md border border-rule bg-ink/60 px-3 py-2.5 text-sm">
+      {entries ? (
+        <>
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-xs text-muted">
+              {entries.length} entries, searched top to bottom
+              {v.expanded ? ", as programs see them" : ""}
+              {v.missingPaths.length > 0 && (
+                <span className="text-missing"> · {v.missingPaths.length} don't exist</span>
+              )}
+            </span>
+            <CopyButton text={v.value} label="Copy value" />
+          </div>
+          <ol className="selectable max-h-72 space-y-0.5 overflow-y-auto">
+            {entries.map((e, i) => {
+              const gone = missing.has(e);
+              return (
+                <li key={i} className="flex min-w-0 items-baseline gap-2.5">
+                  <span className="w-6 shrink-0 text-right font-mono text-xs text-faint">{i + 1}</span>
+                  <span className={`min-w-0 break-all font-mono text-[0.85rem] ${gone ? "text-missing" : ""}`}>{e}</span>
+                  {gone && <span className="shrink-0 text-xs text-missing">doesn't exist</span>}
+                </li>
+              );
+            })}
+          </ol>
+        </>
+      ) : (
+        <>
+          <div className="flex items-start justify-between gap-2">
+            <p className="selectable min-w-0 whitespace-pre-wrap break-all font-mono text-[0.85rem]">{v.value}</p>
+            <CopyButton text={v.value} />
+          </div>
+          {v.expanded && (
+            <p className="selectable mt-2 break-all text-xs text-muted">
+              Expands to <span className="font-mono text-fg">{v.expanded}</span>
+            </p>
+          )}
+          {v.missingPaths.length > 0 && (
+            <p className="mt-2 text-xs text-missing">
+              Doesn't exist: <span className="selectable break-all font-mono">{v.missingPaths.join(", ")}</span>
+            </p>
+          )}
+        </>
+      )}
+      {v.status === "persistentOnly" && v.liveValue !== null && (
+        <p className="selectable mt-2 break-all border-t border-rule pt-2 text-xs text-muted">
+          Open terminals still have <span className="font-mono text-fg">{v.liveValue || "an empty value"}</span>
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -197,10 +261,44 @@ function ViewRow({
   caseInsensitive,
 }: TableProps & { v: EnvVar; onEdit: () => void; onAskDelete: () => void }) {
   const revealed = isRevealed(v);
+  const masked = v.sensitive && !revealed;
   const picked = selected.has(rowId(v));
   const isPath = isPathVar(v, caseInsensitive);
+  const sep = caseInsensitive ? ";" : ":";
+  const [open, setOpen] = useState(false);
+  const expandable = !masked && v.value !== "" && isLong(v, sep);
+  const entries = listEntries(v, sep);
+
+  // One short line under the value; the full story is in the opened row.
+  let note: ReactNode = null;
+  if (v.missingPaths.length > 0) {
+    note = masked
+      ? "Points to a path that doesn't exist"
+      : v.checkedPaths > 1
+        ? `${v.missingPaths.length} of ${v.checkedPaths} entries don't exist`
+        : `Doesn't exist: ${v.missingPaths[0]}`;
+    note = <span className="text-missing">{note}</span>;
+  } else if (v.status === "persistentOnly" && v.liveValue !== null) {
+    note = "Open terminals still have an older value";
+  } else if (v.expanded && !masked) {
+    note = (
+      <>
+        Expands to <span className="font-mono">{v.expanded}</span>
+      </>
+    );
+  } else if (entries) {
+    note = `${entries.length} entries`;
+  }
+
   return (
-    <div role="row" aria-selected={picked} className={`${ROW} ${picked ? "bg-process/[0.07]" : "hover:bg-raised/40"}`}>
+    <div
+      role="row"
+      aria-selected={picked}
+      className={`group/row ${ROW} ${picked ? "bg-process/[0.07]" : "hover:bg-raised/40"}`}
+      onDoubleClick={(e) => {
+        if (!(e.target as HTMLElement).closest("button, input, a, .selectable")) onEdit();
+      }}
+    >
       <div role="cell" className={`${C.key} flex items-center gap-3`}>
         <input
           type="checkbox"
@@ -213,25 +311,32 @@ function ViewRow({
           {v.key}
         </span>
       </div>
-      <div role="cell" className={C.value}>
-        <SecretValue value={v.value} sensitive={v.sensitive} revealed={revealed} onToggle={() => onToggleReveal(v)} />
-        {v.status === "persistentOnly" && v.liveValue !== null && (
-          <p className="mt-0.5 truncate text-xs text-muted">
-            {v.sensitive && !revealed ? (
-              "Running environment still has an older value"
-            ) : (
-              <>
-                Running environment still has <span className="font-mono">{v.liveValue || "an empty value"}</span>
-              </>
-            )}
-          </p>
+      <div role="cell" className={`${C.value} flex min-w-0 items-start gap-1`}>
+        {expandable ? (
+          <IconButton
+            label={open ? "Hide full value" : "Show full value"}
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+            className="-ml-1.5 mt-px h-6 w-6"
+          >
+            <ChevronRightIcon className={`transition-transform ${open ? "rotate-90" : ""}`} />
+          </IconButton>
+        ) : (
+          <span className="-ml-1.5 w-6 shrink-0" aria-hidden />
         )}
-        {v.expanded && !(v.sensitive && !revealed) && (
-          <p className="mt-0.5 truncate text-xs text-muted" title={v.expanded}>
-            Expands to <span className="font-mono">{v.expanded}</span>
-          </p>
-        )}
-        {v.missingPaths.length > 0 && <PathProblems v={v} hidden={v.sensitive && !revealed} />}
+        <div className="min-w-0 flex-1">
+          <SecretValue value={v.value} sensitive={v.sensitive} revealed={revealed} onToggle={() => onToggleReveal(v)} />
+          {note && !open && (
+            <button
+              type="button"
+              disabled={!expandable}
+              onClick={() => setOpen(true)}
+              className="block max-w-full truncate text-left text-xs text-muted enabled:hover:text-fg"
+            >
+              {note}
+            </button>
+          )}
+        </div>
       </div>
       <div role="cell" className={C.scope}>
         <ScopeCell scope={v.scope} />
@@ -239,7 +344,10 @@ function ViewRow({
       <div role="cell" className={C.status}>
         <StatusPill status={v.status} />
       </div>
-      <div role="cell" className={C.actions}>
+      <div
+        role="cell"
+        className={`${C.actions} transition-opacity lg:opacity-0 lg:focus-within:opacity-100 lg:group-hover/row:opacity-100`}
+      >
         <IconButton label={isPath ? "Edit PATH in the PATH editor" : `Edit ${v.key}`} onClick={onEdit}>
           <PencilIcon />
         </IconButton>
@@ -247,6 +355,7 @@ function ViewRow({
           <TrashIcon />
         </IconButton>
       </div>
+      {open && expandable && <ValueDetails v={v} sep={sep} />}
     </div>
   );
 }

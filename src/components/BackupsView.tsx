@@ -3,6 +3,7 @@ import { syncApi, type BackupEntry, type PlatformInfo, type RestorePreview, type
 import { plural } from "../lib/useEnvironment";
 import { Button, IconButton } from "./IconButton";
 import { Help } from "./Help";
+import { PageHeader } from "./PageHeader";
 import { TrashIcon } from "./icons";
 import { HELP } from "../lib/helpText";
 
@@ -171,25 +172,26 @@ export function BackupsView({ backups, platform, busy, onRestore, onDelete }: Pr
   };
 
   return (
-    <div className="flex max-w-3xl flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-semibold">
-            Backups <Help label="How do backups work?">{HELP.backups}</Help>
-          </h1>
-          <p className="mt-1 max-w-[62ch] text-sm text-muted">
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="Backups"
+        help={<Help label="How do backups work?">{HELP.backups}</Help>}
+        description={
+          <>
             Saved before every change. Restore any of them, or delete the ones you don't need.
-          </p>
-          {platform && <p className="mt-2 truncate font-mono text-xs text-faint">{platform.backupDir}</p>}
-        </div>
-        <Button
-          className="border border-rule"
-          disabled={allDeletable.length === 0}
-          onClick={() => setConfirming({ kind: "all" })}
-        >
-          Clear backups
-        </Button>
-      </div>
+            {platform && (
+              <span className="selectable mt-1 block truncate font-mono text-xs text-faint" title={platform.backupDir}>
+                {platform.backupDir}
+              </span>
+            )}
+          </>
+        }
+        actions={
+          <Button variant="secondary" disabled={allDeletable.length === 0} onClick={() => setConfirming({ kind: "all" })}>
+            Clear backups
+          </Button>
+        }
+      />
 
       {confirming?.kind === "all" && (
         <ConfirmStrip
@@ -257,7 +259,7 @@ export function BackupsView({ backups, platform, busy, onRestore, onDelete }: Pr
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
-                    <Button className="border border-rule" onClick={() => setConfirming({ kind: "restore", id: b.id })}>
+                    <Button variant="secondary" onClick={() => setConfirming({ kind: "restore", id: b.id })}>
                       Restore
                     </Button>
                     {b.original ? (
