@@ -26,7 +26,10 @@ describe("entryError", () => {
     expect(entryError(" /a", ":", true)).toMatch(/space/);
     expect(entryError("/a:/b", ":", true)).toMatch(/separates/);
     expect(entryError("C:\\tools", ";", false)).toBeNull();
-    expect(entryError("$(brew --prefix)/bin", ":", true)).toMatch(/commands/);
+    expect(entryError("$(brew --prefix)/bin", ":", true)).toMatch(/plain variables/);
+    expect(entryError("${X-/tmp}", ":", true)).toMatch(/plain variables/);
+    expect(entryError("${HOME}/bin:", ":", true)).toMatch(/separates/);
+    expect(entryError("$HOME/go/bin", ":", true)).toBeNull();
   });
 });
 

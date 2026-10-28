@@ -26,6 +26,12 @@ pub fn app_data_dir() -> PathBuf {
     data_local().join(APP_DIR)
 }
 
+/// Create the app folder accessible to the user only (macOS/Linux): it
+/// holds backups, sync scripts and profiles, which contain values.
+pub fn secure_app_dir() -> crate::Result<()> {
+    crate::fsutil::secure_dir(&app_data_dir())
+}
+
 pub fn backups_dir() -> PathBuf {
     app_data_dir().join("backups")
 }

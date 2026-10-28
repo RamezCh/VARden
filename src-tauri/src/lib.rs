@@ -84,6 +84,49 @@ fn log_panics() {
     }));
 }
 
+/// First close: ask whether VARden should stay in the tray, remember the
+/// answer (it can be changed in Settings), then hide or quit.
+fn ask_what_close_does(window: &tauri::Window) {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+    let app = window.app_handle().clone();
+    let tray = if cfg!(target_os = "macos") {
+        "menu bar"
+    } else {
+        "tray"
+    };
+    window
+        .dialog()
+        .message(format!(
+            "VARden can keep running in the {tray} when you close its window, so Sync to terminals stays one click away.\n\nYou can change this later in Settings."
+        ))
+        .title("Keep VARden running?")
+        .kind(MessageDialogKind::Info)
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            format!("Keep in {tray}"),
+            "Quit".into(),
+        ))
+        .parent(window)
+        .show(move |keep| {
+            let mgr = app.state::<EnvManager>();
+            let prefs = envcore::manager::AppPrefs {
+                close_to_tray: keep,
+                close_asked: true,
+                ..mgr.app_prefs()
+            };
+            if let Err(e) = mgr.set_app_prefs(prefs) {
+                log::error!("Couldn't save the close choice: {e}");
+            }
+            log::info!("First close: keep in tray = {keep}");
+            if keep {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.hide();
+                }
+            } else {
+                app.exit(0);
+            }
+        });
+}
+
 /// Undo what VARden added outside its own folder, so uninstalling leaves
 /// nothing behind: the terminal-sync lines in shell profiles (each backed up
 /// first). Variables themselves stay; they belong to the user, not the app.
@@ -131,10 +174,17 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
         // Closing the window keeps VARden in the tray, unless turned off.
+        // The first time, the user is asked which they prefer.
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
-                let mgr = window.state::<EnvManager>();
-                if mgr.app_prefs().close_to_tray && tray::is_available(window.app_handle()) {
+                if !tray::is_available(window.app_handle()) {
+                    return;
+                }
+                let prefs = window.state::<EnvManager>().app_prefs();
+                if !prefs.close_asked {
+                    api.prevent_close();
+                    ask_what_close_does(window);
+                } else if prefs.close_to_tray {
                     api.prevent_close();
                     let _ = window.hide();
                     log::info!("Window closed to the tray");
@@ -149,6 +199,9 @@ pub fn run() {
                 std::env::consts::OS
             );
             migrate_legacy_data();
+            if let Err(e) = paths::secure_app_dir() {
+                log::warn!("Couldn't restrict the app folder to this user: {e}");
+            }
 
             // %LOCALAPPDATA%\VARden\backups on Windows.
             let manager = EnvManager::new(paths::backups_dir());
@@ -217,6 +270,14 @@ pub fn run() {
             commands::prepare_report,
             commands::save_report,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running VARden");
+        .build(tauri::generate_context!())
+        .expect("error while building VARden")
+        .run(|_app, _event| {
+            // macOS: clicking the Dock icon while the window is hidden
+            // (closed to the menu bar) brings it back.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = _event {
+                focus_main_window(_app);
+            }
+        });
 }

@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VARden: environment variables, without the guesswork</title>
+  <meta name="description" content="A free desktop app for Windows, macOS and Linux. See all your environment variables, fix broken ones, edit PATH safely, and update open terminals without restarting them.">
+  <meta name="color-scheme" content="dark light">
+  <meta property="og:title" content="VARden: environment variables, without the guesswork">
+  <meta property="og:description" content="See all your environment variables, fix broken ones, edit PATH safely, and update open terminals without restarting them.">
+  <meta property="og:image" content="images/variables-dark.png">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="fonts/atkinson-hyperlegible-next-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script>document.documentElement.classList.add("js")</script>
+  <script src="main.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="top">
+    <div class="wrap top-inner">
+      <a class="wordmark" href="#" aria-label="VARden home">
+        <span class="brace" aria-hidden="true">{</span><span class="var" aria-hidden="true">VAR<span class="dots"><i></i><i></i><i></i></span></span><span class="brace" aria-hidden="true">}</span><span aria-hidden="true">den</span>
+      </a>
+      <nav aria-label="Page">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="#faq">FAQ</a>
+        <a href="https://github.com/RamezCh/VARden">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero wrap">
+      <div class="hero-text">
+        <h1>Environment variables, without the guesswork.</h1>
+        <p class="lede">
+          VARden shows every variable you've set in one place, flags the broken ones, edits PATH without risk,
+          and updates terminals that are already open. No restart, no admin rights.
+        </p>
+        <div class="cta">
+          <a class="btn primary" id="download-main" href="#download">Download VARden</a>
+          <a class="btn" href="https://github.com/RamezCh/VARden">View the source</a>
+        </div>
+        <p class="cta-note" id="download-note">Free for Windows, macOS and Linux.</p>
+      </div>
+
+      <figure class="terminal" aria-label="A terminal picking up a new value after Sync to terminals">
+        <div class="term-bar"><span></span><span></span><span></span><b>PowerShell</b></div>
+        <div class="term-body" id="term" aria-hidden="true">
+          <p><span class="prompt">PS&gt;</span> echo $env:API_URL</p>
+          <p class="out">https://staging.example.com</p>
+          <p class="event" data-step="1"><span class="sync-dot"></span>VARden: Sync to terminals</p>
+          <p data-step="2"><span class="prompt">PS&gt;</span> echo $env:API_URL</p>
+          <p class="out ok" data-step="3">https://api.example.com</p>
+          <p data-step="4"><span class="prompt">PS&gt;</span> <span class="caret"></span></p>
+        </div>
+        <figcaption>Same window, new value. The terminal picks up the change before its next prompt.</figcaption>
+      </figure>
+    </section>
+
+    <section class="shot wrap">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="images/variables-light.png">
+        <img src="images/variables-dark.png" width="2560" height="1560" alt="The VARden window: a list of variables, each with a coloured status dot, its value, scope and status" loading="lazy">
+      </picture>
+    </section>
+
+    <section class="wrap prose-block" id="problem">
+      <h2>Why it exists</h2>
+      <div class="two-col">
+        <p>
+          Installers, SDKs and tutorials keep asking you to "add this to your environment". On Windows that means a small
+          dialog several clicks deep, with PATH as one long line. On macOS and Linux it means <code>export</code> lines
+          spread across <code>.bashrc</code>, <code>.zshrc</code> and friends.
+        </p>
+        <p>
+          Then the terminal you already have open doesn't notice the change, nothing tells you when <code>JAVA_HOME</code>
+          points to a JDK you removed last year, and one wrong edit to PATH breaks every command, with no undo.
+        </p>
+      </div>
+    </section>
+
+    <section class="wrap" id="features">
+      <h2>What it does</h2>
+      <dl class="features">
+        <div>
+          <dt><span class="dot red"></span>Finds what's broken</dt>
+          <dd>Values that point to folders or files that don't exist are marked red, down to the single missing folder in PATH.</dd>
+        </div>
+        <div>
+          <dt><span class="dot yellow"></span>Updates open terminals</dt>
+          <dd>One click and PowerShell, Git Bash, bash, zsh and fish pick up your changes before their next prompt.</dd>
+        </div>
+        <div>
+          <dt><span class="dot green"></span>Can't break your system</dt>
+          <dd>Only your own variables are ever written, never system ones, so it never asks for administrator rights.</dd>
+        </div>
+        <div>
+          <dt><span class="dot blue"></span>Undo for everything</dt>
+          <dd>A backup is taken before every change. Undo is one click, and the original state from before VARden is kept forever.</dd>
+        </div>
+        <div>
+          <dt><span class="dot plain"></span>Keeps secrets off screen</dt>
+          <dd>API keys and passwords are masked, can be copied without being shown, and can't be found by typing guesses into search.</dd>
+        </div>
+        <div>
+          <dt><span class="dot plain"></span>Profiles and .env files</dt>
+          <dd>Switch a whole set of variables per client or project at once, and import or export <code>.env</code> files.</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="wrap tour">
+      <div class="tour-row">
+        <div class="tour-text">
+          <h3>Edit PATH as a list you can trust</h3>
+          <p>
+            Add, remove and reorder your own folders. The system part is shown but locked. Each folder is checked as you
+            type, and nothing is saved until you've reviewed exactly what changes.
+          </p>
+        </div>
+        <picture>
+          <source media="(prefers-color-scheme: light)" srcset="images/path-review-light.png">
+          <img src="images/path-review-dark.png" width="2560" height="1560" alt="The PATH review step: one folder added, one removed, and a Save PATH button" loading="lazy">
+        </picture>
+      </div>
+      <div class="tour-row flip">
+        <div class="tour-text">
+          <h3>Read long values without squinting</h3>
+          <p>
+            Open any long value right in the list. PATH shows one folder per line, with the ones that don't exist in red.
+            Copy the whole value with one click.
+          </p>
+        </div>
+        <picture>
+          <source media="(prefers-color-scheme: light)" srcset="images/long-values-light.png">
+          <img src="images/long-values-dark.png" width="2560" height="1560" alt="The Path row opened, listing each folder on its own line with one missing folder marked in red" loading="lazy">
+        </picture>
+      </div>
+      <div class="tour-row">
+        <div class="tour-text">
+          <h3>Go back to any earlier state</h3>
+          <p>
+            Backups are grouped by day. Before restoring one, you see exactly which variables would come back, change or
+            disappear, and the restore itself can be undone too.
+          </p>
+        </div>
+        <picture>
+          <source media="(prefers-color-scheme: light)" srcset="images/backups-light.png">
+          <img src="images/backups-dark.png" width="2560" height="1560" alt="The Backups page with a preview of what restoring would change" loading="lazy">
+        </picture>
+      </div>
+    </section>
+
+    <section class="wrap" id="how">
+      <h2>How Sync to terminals works</h2>
+      <p class="section-lede">
+        Programs read environment variables once, when they start. That's why tutorials say "restart your terminal".
+        VARden adds a tiny, clearly marked hook to each shell you choose, and then:
+      </p>
+      <ol class="steps">
+        <li><p><strong>You click Sync to terminals.</strong> VARden writes the new values to its own folder and bumps a counter.</p></li>
+        <li><p><strong>You press Enter in any open terminal.</strong> Before drawing the next prompt, the hook reads the counter: one tiny file read.</p></li>
+        <li><p><strong>The counter changed, so the terminal updates.</strong> Variables are set or removed, and PATH is merged folder by folder, so an active virtualenv survives.</p></li>
+      </ol>
+      <p class="aside">
+        VARden only ever writes where your account keeps its variables: <code>HKEY_CURRENT_USER\Environment</code> on Windows,
+        a marked block in your startup file on macOS and Linux. It doesn't need to be running for your variables to work.
+      </p>
+    </section>
+
+    <section class="wrap" id="compare">
+      <h2>Compared with what you'd use otherwise</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col"><span class="sr">Feature</span></th>
+              <th scope="col">VARden</th>
+              <th scope="col">Windows dialog</th>
+              <th scope="col"><code>setx</code></th>
+              <th scope="col">Editing <code>.zshrc</code></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">See every variable at once</th><td class="y">Yes</td><td class="y">Yes</td><td>No</td><td>No</td></tr>
+            <tr><th scope="row">Backup and undo for every change</th><td class="y">Yes</td><td>No</td><td>No</td><td>No</td></tr>
+            <tr><th scope="row">Flags folders that don't exist</th><td class="y">Yes</td><td>No</td><td>No</td><td>No</td></tr>
+            <tr><th scope="row">Updates terminals that are already open</th><td class="y">Yes</td><td>No</td><td>No</td><td><code>source</code> in each</td></tr>
+            <tr><th scope="row">PATH as a list, reviewed before saving</th><td class="y">Yes</td><td>List, no review</td><td>No, cuts values at 1,024 characters</td><td>No</td></tr>
+            <tr><th scope="row">Secrets masked on screen</th><td class="y">Yes</td><td>No</td><td>No</td><td>No</td></tr>
+            <tr><th scope="row">Needs admin rights</th><td class="y">Never</td><td>For system variables</td><td>For <code>/M</code></td><td>No</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="wrap" id="faq">
+      <h2>Questions</h2>
+      <div class="faq">
+        <details>
+          <summary>Is it safe? Could it break my computer?</summary>
+          <p>VARden only writes variables that belong to your account, never system-wide ones, so it can't affect other accounts or Windows itself. Every change is backed up first and can be undone, and the very first backup of each place it writes to is kept forever.</p>
+        </details>
+        <details>
+          <summary>I changed a variable but my terminal still has the old value.</summary>
+          <p>Programs read variables once, when they start. Either open a new terminal, or install terminal sync for your shell on VARden's Shells page; after that, Sync to terminals updates open ones. Other programs, like your editor, need a restart.</p>
+        </details>
+        <details>
+          <summary>Are my API keys stored securely?</summary>
+          <p>VARden stores values exactly where your system expects them (the registry, or your shell's startup file), because that's what programs read. It masks secrets on screen, never writes values to its log, and keeps its backups in a folder only your account can open.</p>
+        </details>
+        <details>
+          <summary>Why can't I edit system variables?</summary>
+          <p>On purpose. System variables affect every account and need administrator rights, so a mistake is much harder to undo. VARden shows the system part of PATH read-only so you see the whole picture.</p>
+        </details>
+        <details>
+          <summary>Windows says "Windows protected your PC". Is that normal?</summary>
+          <p>Yes, for now. The installer isn't signed with a paid certificate yet, so Windows doesn't recognise it. Click More info, then Run anyway. Updates installed from inside VARden don't show this.</p>
+        </details>
+        <details>
+          <summary>Does VARden send any data?</summary>
+          <p>No telemetry, no account. The only request it makes is a check for new versions on GitHub when it starts, which you can turn off in Settings. Updates are signed, and VARden refuses any update whose signature doesn't match.</p>
+        </details>
+        <details>
+          <summary>What happens if I uninstall it?</summary>
+          <p>Your variables stay; they belong to your account. On Windows the uninstaller also removes VARden's terminal-sync lines from your shell profiles. On macOS and Linux, remove terminal sync on the Shells page before deleting the app.</p>
+        </details>
+      </div>
+      <p class="more">More answers in the <a href="https://github.com/RamezCh/VARden#faq">full FAQ</a>.</p>
+    </section>
+
+    <section class="wrap download" id="download">
+      <h2>Download</h2>
+      <p class="section-lede" id="release-line">Free for Windows, macOS and Linux.</p>
+      <ul class="platforms" id="platforms">
+        <li data-os="windows">
+          <h3>Windows 10 and 11</h3>
+          <p>Installs for your account only, no administrator rights. Asks before adding Start menu and desktop shortcuts.</p>
+          <a class="btn" data-asset="windows" href="https://github.com/RamezCh/VARden/releases/latest">Download installer</a>
+        </li>
+        <li data-os="macos">
+          <h3>macOS 11 or later</h3>
+          <p>One download for Apple Silicon and Intel Macs.</p>
+          <a class="btn" data-asset="macos" href="https://github.com/RamezCh/VARden/releases/latest">Download .dmg</a>
+        </li>
+        <li data-os="linux">
+          <h3>Linux</h3>
+          <p>The AppImage runs anywhere and updates itself. Prefer packages? <a data-asset="deb" href="https://github.com/RamezCh/VARden/releases/latest">.deb</a> or <a data-asset="rpm" href="https://github.com/RamezCh/VARden/releases/latest">.rpm</a>.</p>
+          <a class="btn" data-asset="linux" href="https://github.com/RamezCh/VARden/releases/latest">Download AppImage</a>
+        </li>
+      </ul>
+      <p class="aside" id="no-release" hidden>
+        The first release is being prepared. Until it's out, you can <a href="https://github.com/RamezCh/VARden#build-from-source">build VARden from source</a> in a few minutes.
+      </p>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <p>
+      Made by Ramez Chreide.
+      <a href="https://github.com/RamezCh/VARden">Source on GitHub</a>
+      <a href="https://github.com/RamezCh/VARden/issues/new/choose">Report a problem</a>
+      <a href="https://github.com/RamezCh/VARden/releases">All releases</a>
+    </p>
+  </footer>
+</body>
+</html>

@@ -77,6 +77,44 @@ pub fn resolve_target(path: &Path) -> PathBuf {
 /// Write via a sibling temp file + rename so a crash never leaves a
 /// half-written rc file behind.
 pub fn write_atomic(path: &Path, data: &[u8]) -> Result<()> {
+    write_atomic_with(path, data, false)
+}
+
+/// Like [`write_atomic`], for files holding secrets (an exported `.env`): a
+/// new file is readable by its owner only on macOS/Linux, from the first
+/// byte. An existing file keeps its permissions.
+pub fn write_private(path: &Path, data: &[u8]) -> Result<()> {
+    write_atomic_with(path, data, true)
+}
+
+/// Make a folder that will hold secrets (backups, sync scripts, profiles)
+/// accessible to its owner only on macOS/Linux. Windows already limits
+/// `%LOCALAPPDATA%` to the user.
+pub fn secure_dir(path: &Path) -> Result<()> {
+    fs::create_dir_all(path).map_err(|e| Error::io(path, e))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700))
+            .map_err(|e| Error::io(path, e))?;
+    }
+    Ok(())
+}
+
+fn create_file(path: &Path, private: bool) -> std::io::Result<fs::File> {
+    let mut opts = fs::OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    if private {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
+    }
+    #[cfg(not(unix))]
+    let _ = private;
+    opts.open(path)
+}
+
+fn write_atomic_with(path: &Path, data: &[u8], private: bool) -> Result<()> {
     let target = resolve_target(path);
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
@@ -88,7 +126,8 @@ pub fn write_atomic(path: &Path, data: &[u8]) -> Result<()> {
     let tmp = target.with_file_name(format!(".{file_name}.varden-tmp"));
 
     let result = (|| {
-        let mut f = fs::File::create(&tmp).map_err(|e| Error::io(&tmp, e))?;
+        let _ = fs::remove_file(&tmp); // a leftover from a crash, with unknown permissions
+        let mut f = create_file(&tmp, private).map_err(|e| Error::io(&tmp, e))?;
         f.write_all(data).map_err(|e| Error::io(&tmp, e))?;
         f.sync_all().map_err(|e| Error::io(&tmp, e))?;
         drop(f);
@@ -107,6 +146,32 @@ pub fn write_atomic(path: &Path, data: &[u8]) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
+    #[test]
+    fn private_files_and_dirs_are_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let secret = dir.path().join(".env");
+        write_private(&secret, b"K=v").unwrap();
+        assert_eq!(
+            fs::metadata(&secret).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        // An existing file keeps the permissions its owner chose.
+        fs::set_permissions(&secret, fs::Permissions::from_mode(0o640)).unwrap();
+        write_private(&secret, b"K=w").unwrap();
+        assert_eq!(
+            fs::metadata(&secret).unwrap().permissions().mode() & 0o777,
+            0o640
+        );
+        let app = dir.path().join("VARden");
+        secure_dir(&app).unwrap();
+        assert_eq!(
+            fs::metadata(&app).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+    }
+
     use super::*;
 
     #[test]

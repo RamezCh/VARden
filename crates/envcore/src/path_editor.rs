@@ -184,11 +184,46 @@ pub fn validate_entries(entries: &[String]) -> Result<()> {
         if e.contains(['\n', '\r', '\0']) {
             return Err(bad(e, "contains a line break"));
         }
-        if !cfg!(windows) && (e.contains(['"', '\'', '`', '\\']) || e.contains("$(")) {
-            return Err(bad(e, "contains quotes, backslashes or a command"));
+        if !cfg!(windows) && (e.contains(['"', '\'', '`', '\\']) || !simple_variables_only(e)) {
+            return Err(bad(
+                e,
+                "can only use plain variables like $HOME or ${HOME}, without quotes, backslashes or commands",
+            ));
         }
     }
     Ok(())
+}
+
+/// `$NAME` and `${NAME}` only: the line is written inside double quotes,
+/// where anything fancier (`$(…)`, `${x:-…}`, `${x@P}`) could run code.
+fn simple_variables_only(entry: &str) -> bool {
+    let name_ok = |n: &str| {
+        let mut c = n.chars();
+        matches!(c.next(), Some(f) if f == '_' || f.is_ascii_alphabetic())
+            && c.all(|c| c == '_' || c.is_ascii_alphanumeric())
+    };
+    let mut rest = entry;
+    while let Some(i) = rest.find('$') {
+        let after = &rest[i + 1..];
+        if let Some(braced) = after.strip_prefix('{') {
+            let Some(end) = braced.find('}') else {
+                return false;
+            };
+            if !name_ok(&braced[..end]) {
+                return false;
+            }
+            rest = &braced[end + 1..];
+        } else {
+            let end = after
+                .find(|c: char| !(c == '_' || c.is_ascii_alphanumeric()))
+                .unwrap_or(after.len());
+            if !name_ok(&after[..end]) {
+                return false;
+            }
+            rest = &after[end..];
+        }
+    }
+    true
 }
 
 // ---------- checking ----------
@@ -544,6 +579,12 @@ mod tests {
         assert!(validate_entries(&[" /a".into()]).is_err());
         assert!(validate_entries(&[format!("/a{}b", sep())]).is_err());
         assert!(validate_entries(&["/a\nb".into()]).is_err());
+        if !cfg!(windows) {
+            assert!(validate_entries(&["${HOME}/bin".into(), "$HOME/x_$USER".into()]).is_ok());
+            for bad in ["$(id)/bin", "${PS1@P}", "${X:-/tmp}", "$", "${}", "$1/bin"] {
+                assert!(validate_entries(&[bad.to_string()]).is_err(), "{bad}");
+            }
+        }
     }
 
     #[cfg(not(windows))]

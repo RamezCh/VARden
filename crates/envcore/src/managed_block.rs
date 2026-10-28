@@ -311,8 +311,47 @@ pub fn render_assignment(syntax: Syntax, key: &str, value: &str) -> String {
             }
             format!("$env.{key} = \"{esc}\"")
         }
-        Syntax::PowerShell => format!("$env:{key} = '{}'", value.replace('\'', "''")),
+        Syntax::PowerShell => format!("$env:{key} = {}", ps_single_quote(value)),
     }
+}
+
+/// Characters PowerShell treats as a single quote: the ASCII one and the
+/// curly ones. Any of them ends a single-quoted string, so each must be
+/// doubled, or a value like `’; Remove-Item …` would run as code.
+const PS_SINGLE_QUOTES: [char; 5] = ['\'', '\u{2018}', '\u{2019}', '\u{201A}', '\u{201B}'];
+/// Likewise for double quotes.
+const PS_DOUBLE_QUOTES: [char; 4] = ['"', '\u{201C}', '\u{201D}', '\u{201E}'];
+
+/// A PowerShell single-quoted string that is always read back literally.
+pub fn ps_single_quote(value: &str) -> String {
+    let mut out = String::with_capacity(value.len() + 2);
+    out.push('\'');
+    for c in value.chars() {
+        out.push(c);
+        if PS_SINGLE_QUOTES.contains(&c) {
+            out.push(c);
+        }
+    }
+    out.push('\'');
+    out
+}
+
+/// Inverse of [`ps_single_quote`] for the text between the outer quotes.
+/// `None` if a quote character isn't doubled (the string would end early).
+fn ps_single_unquote(inner: &str) -> Option<String> {
+    let mut out = String::with_capacity(inner.len());
+    let mut chars = inner.chars().peekable();
+    while let Some(c) = chars.next() {
+        if PS_SINGLE_QUOTES.contains(&c) {
+            match chars.next() {
+                Some(d) if PS_SINGLE_QUOTES.contains(&d) => out.push(c),
+                _ => return None,
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    Some(out)
 }
 
 fn opaque(text: &str, key: Option<&str>, raw_value: Option<&str>) -> BlockLine {
@@ -508,11 +547,11 @@ fn parse_powershell(t: &str) -> Parsed {
     };
     let (key, rhs) = (key.trim(), rhs.trim());
     let lit = if let Some(inner) = rhs.strip_prefix('\'').and_then(|r| r.strip_suffix('\'')) {
-        // '' is an escaped quote; a lone ' would end the string early.
-        let unescaped = inner.replace("''", "\u{0}");
-        (!unescaped.contains('\'')).then(|| unescaped.replace('\u{0}', "'"))
+        // Doubled quotes are escaped quotes; a lone one would end the string early.
+        ps_single_unquote(inner)
     } else if let Some(inner) = rhs.strip_prefix('"').and_then(|r| r.strip_suffix('"')) {
-        (!inner.contains(['$', '`', '"'])).then(|| inner.to_string())
+        (!inner.contains(['$', '`']) && !inner.contains(PS_DOUBLE_QUOTES))
+            .then(|| inner.to_string())
     } else {
         None
     };
@@ -544,6 +583,7 @@ mod tests {
         "\"double\"",
         "semi;colon&amp|pipe",
         "unicode ✓ ünïcødé",
+        "smart ’; Write-Output PWNED; ‘ quotes ‚‛ “”",
     ];
 
     #[test]

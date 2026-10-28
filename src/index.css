@@ -18,7 +18,7 @@
   --color-rule: #2e3542;
   --color-fg: #e4e7ec;
   --color-muted: #959fae;
-  --color-faint: #687284;
+  --color-faint: #8590a0;
 
   --color-synced: #57c59a;
   --color-persistent: #e5b34e;
@@ -37,7 +37,7 @@
     --color-rule: #dcdfe5;
     --color-fg: #1a1f29;
     --color-muted: #586273;
-    --color-faint: #8a93a2;
+    --color-faint: #656e7e;
     --color-synced: #18855a;
     --color-persistent: #9a6700;
     --color-process: #2563c9;
@@ -54,7 +54,7 @@
   --color-rule: #dcdfe5;
   --color-fg: #1a1f29;
   --color-muted: #586273;
-  --color-faint: #8a93a2;
+  --color-faint: #656e7e;
   --color-synced: #18855a;
   --color-persistent: #9a6700;
   --color-process: #2563c9;

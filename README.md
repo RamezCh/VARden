@@ -11,6 +11,12 @@
 </p>
 
 <p align="center">
+  <a href="https://ramezch.github.io/VARden/"><b>Website</b></a> ·
+  <a href="https://github.com/RamezCh/VARden/releases/latest"><b>Download</b></a> ·
+  <a href="#faq"><b>FAQ</b></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/RamezCh/VARden/actions/workflows/ci.yml"><img src="https://github.com/RamezCh/VARden/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 

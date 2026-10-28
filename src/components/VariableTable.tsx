@@ -13,7 +13,7 @@ import { HELP } from "../lib/helpText";
 //   value
 //   scope   status
 const ROW =
-  "grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1.5 px-4 py-3 lg:grid-cols-[minmax(160px,1.1fr)_minmax(0,2fr)_92px_164px_128px] lg:items-center lg:gap-y-0 lg:py-2";
+  "grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1.5 px-4 py-3 lg:grid-cols-[minmax(190px,1.15fr)_minmax(0,2fr)_88px_150px_72px] lg:items-center lg:gap-y-0 lg:py-2";
 const C = {
   key: "order-1 min-w-0 lg:order-none",
   value: "order-3 col-span-2 min-w-0 lg:order-none lg:col-span-1",

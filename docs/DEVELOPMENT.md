@@ -134,6 +134,18 @@ The sections below were written as each stage landed. They explain behaviour in 
 - **Report a problem.** Settings shows a cleaned copy of the last 400 log lines (`envcore::diagnostics`): variable names become `VAR_1`, `VAR_2`… (consistently, so the log still reads; well-known system names like `PATH` stay), the user's name and home folder become `<you>` and `~`, and secret-looking strings (known key formats, long random tokens, passwords in URLs, `secret=…` pairs) become `[hidden]`. Copy and Save stay disabled until the user confirms they've read it. Then GitHub's issue form (`.github/ISSUE_TEMPLATE/bug_report.yml`) opens with version and OS filled in through the URL. The app never uploads anything.
 - **Settings page.** Theme, start with the computer (`tauri-plugin-autostart`), close to tray and update checks (`settings.json`, `prefs`), version and update controls, links and logs.
 
+### Review fixes
+
+- **PowerShell quoting.** PowerShell treats the curly quotes ‘ ’ ‚ ‛ as single quotes too, so a value containing one could end the quoted string early in a sync script or a PowerShell startup file and run the rest as code. Every single-quote character is now doubled (`managed_block::ps_single_quote`), and the real-shell sync test includes such a value.
+- **Private files.** On macOS and Linux the app folder (backups, sync scripts, profiles, all of which contain values) is restricted to the user (0700) at startup, and exported `.env` files are created owner-only (0600) from the first byte.
+- **PATH editor.** On macOS and Linux an entry may only use plain `$NAME` or `${NAME}`; forms like `${x:-…}` or `${x@P}` could run code inside the double-quoted PATH line.
+- **Desktop.** The first time the window is closed, VARden asks whether to keep running in the tray. On macOS, clicking the Dock icon brings a hidden window back.
+- **Contrast.** The faint text colour meets WCAG AA (4.5:1) in both themes.
+
+### Website
+
+`site/` is a static page (no build step) published to GitHub Pages by `.github/workflows/pages.yml`, which copies `docs/images` into it. `site/main.js` asks the GitHub API for the latest release and points the download buttons at the right files for the visitor's system; until a release is published, it says so and links to building from source.
+
 ### Renamed to VARden
 
 Earlier builds were called *Environment Manager*. On first start, VARden moves their data (backups including originals, sync state, hook scripts) from `%LOCALAPPDATA%\EnvManager` into `%LOCALAPPDATA%\VARden` and removes the old folder. Blocks in startup files written with the old `ENVMANAGER` markers are still recognised and are rewritten with `VARDEN` markers on the next change. Installed terminal-sync hooks are updated to the new location right away, with a backup first.

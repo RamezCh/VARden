@@ -148,7 +148,7 @@ export function SettingsView({ platform, theme, updates, onError }: Props) {
               label={`Keep running in the ${trayName} when closed`}
               checked={prefs?.closeToTray ?? true}
               disabled={!prefs || autostart?.tray === false}
-              onChange={(on) => prefs && void savePrefs({ ...prefs, closeToTray: on })}
+              onChange={(on) => prefs && void savePrefs({ ...prefs, closeToTray: on, closeAsked: true })}
             />
           }
         />

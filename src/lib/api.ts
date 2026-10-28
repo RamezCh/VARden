@@ -269,6 +269,8 @@ export interface AppPrefs {
   closeToTray: boolean;
   /** Look for a new version when VARden starts. */
   checkForUpdates: boolean;
+  /** The first close asked what closing should do. */
+  closeAsked: boolean;
 }
 
 export interface AutostartInfo {

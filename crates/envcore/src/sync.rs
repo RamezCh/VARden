@@ -175,7 +175,7 @@ pub(crate) fn q_fish(s: &str) -> String {
     format!("'{}'", s.replace('\\', r"\\").replace('\'', r"\'"))
 }
 pub(crate) fn q_ps(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "''"))
+    crate::managed_block::ps_single_quote(s)
 }
 
 // ---------- apply scripts ----------
@@ -534,7 +534,7 @@ mod tests {
 
     // ---- end-to-end: run the real hook + apply scripts in installed shells ----
 
-    const TRICKY: &str = r#"it's $HOME `x` \ "q" %PATH% ;"#;
+    const TRICKY: &str = r#"it's $HOME `x` \ "q" %PATH% ; smart ’; Write-Output PWNED; ‘ end"#;
 
     /// Sync 1 is live when the shell starts; sync 2 is published while it
     /// runs. Returns (sync_dir, stage_dir with sync 2, hooks_dir).

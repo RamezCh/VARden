@@ -56,7 +56,8 @@ pub fn read_file(path: &Path) -> Result<ParsedEnv> {
 }
 
 pub fn write_file(path: &Path, entries: &[EnvEntry]) -> Result<()> {
-    fsutil::write_atomic(path, render(entries).as_bytes())
+    // Exported .env files usually hold secrets.
+    fsutil::write_private(path, render(entries).as_bytes())
 }
 
 pub fn parse(input: &str) -> ParsedEnv {

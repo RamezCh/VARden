@@ -40,7 +40,10 @@ export function entryError(entry: string, separator: string, unix: boolean): str
   if (entry.trim() === "") return "Empty entry";
   if (entry.trim() !== entry) return "Starts or ends with a space";
   if (entry.includes(separator)) return `Contains "${separator}", which separates PATH entries. Add each folder on its own.`;
-  if (unix && /["'`\\]|\$\(/.test(entry)) return "Quotes, backslashes and commands aren't allowed";
+  if (unix && /["'`\\]/.test(entry)) return "Quotes and backslashes aren't allowed";
+  // Only $NAME or ${NAME}: anything fancier could run code inside the PATH line.
+  if (unix && entry.replace(/\$(?:[A-Za-z_][A-Za-z0-9_]*|\{[A-Za-z_][A-Za-z0-9_]*\})/g, "").includes("$"))
+    return "Only plain variables like $HOME or ${HOME} are allowed";
   return null;
 }
 

@@ -59,6 +59,8 @@ pub struct AppPrefs {
     pub close_to_tray: bool,
     /// Look for a new version on GitHub when VARden starts.
     pub check_for_updates: bool,
+    /// The user was asked once what closing the window should do.
+    pub close_asked: bool,
 }
 
 impl Default for AppPrefs {
@@ -66,6 +68,7 @@ impl Default for AppPrefs {
         AppPrefs {
             close_to_tray: true,
             check_for_updates: true,
+            close_asked: false,
         }
     }
 }
@@ -968,6 +971,7 @@ mod tests {
         let p = AppPrefs {
             close_to_tray: false,
             check_for_updates: true,
+            close_asked: true,
         };
         m.set_app_prefs(p).unwrap();
         assert_eq!(m.app_prefs(), p);

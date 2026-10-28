@@ -205,21 +205,6 @@ export function VariablesView({
         description="Your saved user variables, plus temporary ones for open terminals."
         actions={
           <>
-            <Button variant="secondary" onClick={onEditPath} title="Add, remove or reorder the folders in your PATH">
-              <PathIcon /> Edit PATH
-            </Button>
-            <Menu
-              label=".env"
-              items={[
-                { label: "Import from .env…", icon: <ImportIcon />, onSelect: onOpenImport },
-                {
-                  label: "Export to .env…",
-                  icon: <ExportIcon />,
-                  disabled: vars.length === 0,
-                  onSelect: () => onOpenExport(rows),
-                },
-              ]}
-            />
             <span className="flex items-center gap-1.5">
               {syncButton}
               <Help label={hooksInstalled > 0 ? "What does Sync to terminals do?" : "What is terminal sync?"}>{HELP.sync}</Help>
@@ -274,6 +259,23 @@ export function VariablesView({
             {revealAll ? <EyeOffIcon /> : <EyeIcon />}
             {revealAll ? "Hide secrets" : "Show secrets"}
           </Button>
+          {/* Tools that work on the list sit with the list, not in the header. */}
+          <Button variant="secondary" className="h-9" onClick={onEditPath} title="Add, remove or reorder the folders in your PATH">
+            <PathIcon /> Edit PATH
+          </Button>
+          <Menu
+            label=".env"
+            className="h-9"
+            items={[
+              { label: "Import from .env…", icon: <ImportIcon />, onSelect: onOpenImport },
+              {
+                label: "Export to .env…",
+                icon: <ExportIcon />,
+                disabled: vars.length === 0,
+                onSelect: () => onOpenExport(rows),
+              },
+            ]}
+          />
         </div>
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
