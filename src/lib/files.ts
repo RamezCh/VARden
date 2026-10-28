@@ -29,6 +29,14 @@ export async function pickExportPath(dir?: string): Promise<string | null> {
   return save({ defaultPath: dir ? joinPath(dir, ".env") : ".env", filters: FILTERS, title: "Export variables" });
 }
 
+export async function pickReportPath(): Promise<string | null> {
+  return save({
+    defaultPath: "varden-report.txt",
+    filters: [{ name: "Text", extensions: ["txt"] }],
+    title: "Save the cleaned log",
+  });
+}
+
 export async function pickFolder(title: string): Promise<string | null> {
   const picked = await open({ multiple: false, directory: true, title });
   return typeof picked === "string" ? picked : null;

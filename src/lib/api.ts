@@ -285,3 +285,16 @@ export const settingsApi = {
   autostart: () => invoke<AutostartInfo>("get_autostart"),
   setAutostart: (enabled: boolean) => invoke<AutostartInfo>("set_autostart", { enabled }),
 };
+
+export interface Report {
+  text: string;
+  namesHidden: number;
+  userHidden: number;
+  secretsHidden: number;
+  lines: number;
+}
+
+export const reportApi = {
+  prepare: (keepNames: boolean) => invoke<Report>("prepare_report", { keepNames }),
+  save: (path: string, text: string) => invoke<void>("save_report", { path, text }),
+};

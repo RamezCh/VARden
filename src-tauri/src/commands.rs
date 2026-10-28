@@ -6,6 +6,7 @@
 use std::path::PathBuf;
 
 use envcore::backup::{BackupEntry, BackupOutcome, DeleteReport};
+use envcore::diagnostics::{self, Sanitized};
 use envcore::dotenv::{self, EnvEntry, ParsedEnv};
 use envcore::manager::{AppPrefs, EnvManager, PlatformInfo, RestorePreview, ShellTarget};
 use envcore::model::{EnvVarView, Scope};
@@ -489,4 +490,39 @@ pub async fn set_autostart(app: AppHandle, enabled: bool) -> CmdResult<Autostart
     )?;
     crate::tray::set_autostart_checked(&app, launcher.is_enabled().unwrap_or(false));
     get_autostart(app).await
+}
+
+// ----- Report a problem -----
+
+/// The recent log, cleaned for sharing (see envcore::diagnostics).
+#[tauri::command]
+pub async fn prepare_report(mgr: State<'_, EnvManager>, keep_names: bool) -> CmdResult<Sanitized> {
+    let log = diagnostics::read_recent_logs(&envcore::paths::logs_dir(), 2);
+    let names = mgr.known_names();
+    let home = dirs::home_dir();
+    let user = diagnostics::user_name();
+    let report = diagnostics::sanitize(
+        &log,
+        &diagnostics::Options {
+            known_names: &names,
+            home: home.as_deref(),
+            user_name: user.as_deref(),
+            keep_names,
+        },
+        400,
+    );
+    log::info!(
+        "Prepared a problem report ({} lines, {} names, {} user mentions, {} secrets hidden)",
+        report.lines,
+        report.names_hidden,
+        report.user_hidden,
+        report.secrets_hidden
+    );
+    Ok(report)
+}
+
+#[tauri::command]
+pub async fn save_report(path: PathBuf, text: String) -> CmdResult<()> {
+    std::fs::write(&path, text)
+        .map_err(|e| Error::Refused(format!("Couldn't save {}: {e}", path.display())))
 }

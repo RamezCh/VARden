@@ -214,6 +214,8 @@ pub fn run() {
             commands::set_app_prefs,
             commands::get_autostart,
             commands::set_autostart,
+            commands::prepare_report,
+            commands::save_report,
         ])
         .run(tauri::generate_context!())
         .expect("error while running VARden");

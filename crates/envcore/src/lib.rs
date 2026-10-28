@@ -8,6 +8,7 @@
 //! machine/system scope, so no elevation (UAC / sudo) is ever required.
 
 pub mod backup;
+pub mod diagnostics;
 pub mod dotenv;
 pub mod error;
 mod fsutil;

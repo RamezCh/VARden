@@ -41,7 +41,7 @@ body:
   - type: textarea
     id: logs
     attributes:
-      label: Log file
+      label: Log
       description: |
-        In VARden, open **Settings > Open log folder** and drag the newest `varden.log` into this box.
-        Logs contain variable *names* and actions, never values. If some names are private, remove those lines first.
+        In VARden, open **Settings > Report a problem**. It shows a cleaned copy of the log (variable names, your user name and anything that looks like a key are hidden). Check it, copy it and paste it here.
+      render: text

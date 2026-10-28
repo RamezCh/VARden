@@ -321,7 +321,7 @@ VARden stores values exactly where your operating system expects them: the Windo
 
 - Secrets are masked on screen and can be copied without being shown.
 - Masked values can't be found by searching.
-- The log file records variable *names*, never values.
+- The log file records variable *names*, never values. When you report a problem, VARden shows you a cleaned copy with names, your user name and anything key-like hidden, and you decide whether to share it.
 - Values are never sent anywhere. The only network request is the optional update check.
 </details>
 
