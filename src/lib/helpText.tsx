@@ -3,6 +3,19 @@ import type { ReactNode } from "react";
 import { STATUS_META, STATUS_ORDER } from "./filter";
 
 export const HELP: Record<string, ReactNode> = {
+  path: (
+    <>
+      <p>
+        PATH lists the folders your terminal searches when you type a program's name. The first folder that has it wins.
+      </p>
+      <p>
+        Only <strong>your</strong> folders can be changed here. The system part, set by your OS and installers, is shown
+        read-only and is never written, so a mistake here can't break programs for other accounts or need an administrator to
+        fix.
+      </p>
+      <p>You see every change before it's saved, a backup is taken first, and Undo puts the old PATH back.</p>
+    </>
+  ),
   scope: (
     <>
       <p>

@@ -21,10 +21,10 @@ Phases 1–3 of the original spec (backend core, dashboard, terminal sync, `.env
 - [x] Screen for custom startup-file paths on macOS/Linux.
 
 ## Stage 4: Editing tools
-- [ ] Safe PATH editor: only your PATH is editable (the system PATH is read-only), warnings for missing folders, a preview of changes before saving.
-- [ ] Rename a variable.
-- [ ] Bulk select and delete in the table.
-- [ ] Up to 5 recent export folders.
+- [x] Safe PATH editor: only your PATH is editable (the system PATH is read-only), warnings for missing folders, a preview of changes before saving.
+- [x] Rename a variable.
+- [x] Bulk select and delete in the table.
+- [x] Up to 5 recent export folders.
 
 ## Stage 5: Release
 - [ ] Installer with a Start menu entry and an optional desktop shortcut.

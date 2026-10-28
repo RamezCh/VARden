@@ -133,6 +133,23 @@ impl PersistentStore for ShellFileStore {
         })
     }
 
+    fn set_expression(
+        &self,
+        key: &str,
+        line: Option<String>,
+        reason: &str,
+        backups: &BackupStore,
+    ) -> Result<Option<BackupOutcome>> {
+        validate_key(key)?;
+        let syntax = self.syntax;
+        self.modify(reason, backups, |b| match line {
+            Some(line) => b.set_expression(syntax, key, line),
+            None => {
+                b.remove(key);
+            }
+        })
+    }
+
     fn remove(&self, key: &str, backups: &BackupStore) -> Result<Option<BackupOutcome>> {
         self.modify(&format!("Before removing {key}"), backups, |b| {
             b.remove(key);

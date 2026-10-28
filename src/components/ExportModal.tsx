@@ -1,5 +1,7 @@
-import { useState } from "react";
-import type { EnvVar, ExportItem } from "../lib/api";
+import { useEffect, useState } from "react";
+import { editApi, type EnvVar, type ExportItem } from "../lib/api";
+import { fileName } from "../lib/files";
+import { FolderIcon } from "./icons";
 import { rowId } from "../lib/filter";
 import { plural } from "../lib/useEnvironment";
 import { Button } from "./IconButton";
@@ -13,14 +15,23 @@ interface Props {
   initial: EnvVar[];
   busy: boolean;
   onClose: () => void;
-  onExport: (items: ExportItem[]) => Promise<boolean>;
+  /** `dir`: start the save dialog in this folder. */
+  onExport: (items: ExportItem[], dir?: string) => Promise<boolean>;
 }
 
 export function ExportModal({ vars, initial, busy, onClose, onExport }: Props) {
   const [picked, setPicked] = useState<ReadonlySet<string>>(
     new Set(initial.filter((v) => v.value !== "").map(rowId)),
   );
+  const [recent, setRecent] = useState<string[]>([]);
+  useEffect(() => {
+    editApi
+      .recentExportFolders()
+      .then(setRecent)
+      .catch(() => {});
+  }, []);
   const chosen = vars.filter((v) => picked.has(rowId(v)));
+  const items = chosen.map(({ key, scope }) => ({ key, scope }));
   const secrets = chosen.filter((v) => v.sensitive).length;
 
   const toggle = (id: string) =>
@@ -54,7 +65,7 @@ export function ExportModal({ vars, initial, busy, onClose, onExport }: Props) {
             variant="primary"
             disabled={busy || chosen.length === 0}
             onClick={async () => {
-              if (await onExport(chosen.map(({ key, scope }) => ({ key, scope })))) onClose();
+              if (await onExport(items, recent[0])) onClose();
             }}
           >
             Save {plural(chosen.length, "variable")}…
@@ -71,6 +82,28 @@ export function ExportModal({ vars, initial, busy, onClose, onExport }: Props) {
           {picked.size === vars.length ? "Select none" : "Select all"}
         </button>
       </div>
+      {recent.length > 0 && (
+        <div className="mb-4">
+          <h3 className="mb-1.5 text-[0.8rem] text-muted">Recent folders</h3>
+          <div className="flex flex-wrap gap-2">
+            {recent.map((dir) => (
+              <button
+                key={dir}
+                type="button"
+                title={`Save in ${dir}`}
+                disabled={busy || chosen.length === 0}
+                onClick={async () => {
+                  if (await onExport(items, dir)) onClose();
+                }}
+                className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-rule px-2.5 py-1 text-sm hover:border-process hover:bg-raised disabled:opacity-50"
+              >
+                <FolderIcon className="shrink-0 text-muted" />
+                <span className="truncate">{fileName(dir) || dir}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <ul className="divide-y divide-rule overflow-hidden rounded-lg border border-rule">
         {vars.map((v) => {
           const id = rowId(v);

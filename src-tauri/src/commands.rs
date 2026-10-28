@@ -9,6 +9,7 @@ use envcore::backup::{BackupEntry, BackupOutcome, DeleteReport};
 use envcore::dotenv::{self, EnvEntry, ParsedEnv};
 use envcore::manager::{EnvManager, PlatformInfo, RestorePreview, ShellTarget};
 use envcore::model::{EnvVarView, Scope};
+use envcore::path_editor::PathInfo;
 use envcore::shells::{self, DetectedShell, ShellKind};
 use envcore::terminal::{SyncReport, TerminalSyncInfo};
 use envcore::transfer::{ExportItem, ExportReport};
@@ -81,6 +82,86 @@ pub async fn delete_variable(
     let backups = logged(
         format!("Deleted {key} ({scope:?})"),
         mgr.remove(&key, scope),
+    )?;
+    Ok(MutationResult {
+        variables: mgr.list(&[])?,
+        backups,
+    })
+}
+
+#[derive(serde::Deserialize)]
+pub struct VarRef {
+    pub key: String,
+    pub scope: Scope,
+}
+
+#[tauri::command]
+pub async fn delete_variables(
+    mgr: State<'_, EnvManager>,
+    items: Vec<VarRef>,
+) -> CmdResult<MutationResult> {
+    let mut backups = Vec::new();
+    for scope in [Scope::User, Scope::Process] {
+        let keys: Vec<String> = items
+            .iter()
+            .filter(|i| i.scope == scope)
+            .map(|i| i.key.clone())
+            .collect();
+        if keys.is_empty() {
+            continue;
+        }
+        backups.extend(logged(
+            format!("Deleted {} ({scope:?})", keys.join(", ")),
+            mgr.remove_many(&keys, scope),
+        )?);
+    }
+    Ok(MutationResult {
+        variables: mgr.list(&[])?,
+        backups,
+    })
+}
+
+#[tauri::command]
+pub async fn rename_variable(
+    mgr: State<'_, EnvManager>,
+    from: String,
+    to: String,
+    scope: Scope,
+) -> CmdResult<MutationResult> {
+    let to = to.trim();
+    let backups = logged(
+        format!("Renamed {from} to {to} ({scope:?})"),
+        mgr.rename(&from, to, scope),
+    )?;
+    Ok(MutationResult {
+        variables: mgr.list(&[])?,
+        backups,
+    })
+}
+
+#[tauri::command]
+pub async fn get_path_info(mgr: State<'_, EnvManager>) -> CmdResult<PathInfo> {
+    mgr.path_info()
+}
+
+#[tauri::command]
+pub async fn check_path_entries(
+    mgr: State<'_, EnvManager>,
+    entries: Vec<String>,
+    base_at: usize,
+) -> CmdResult<PathInfo> {
+    mgr.check_path_entries(&entries, base_at)
+}
+
+#[tauri::command]
+pub async fn set_user_path(
+    mgr: State<'_, EnvManager>,
+    entries: Vec<String>,
+    base_at: usize,
+) -> CmdResult<MutationResult> {
+    let backups = logged(
+        format!("Saved PATH ({} entries)", entries.len()),
+        mgr.set_user_path(&entries, base_at),
     )?;
     Ok(MutationResult {
         variables: mgr.list(&[])?,
@@ -242,10 +323,19 @@ pub async fn export_env_file(
     path: PathBuf,
     items: Vec<ExportItem>,
 ) -> CmdResult<ExportReport> {
-    logged(
+    let report = logged(
         format!("Exported {} variable(s) to {}", items.len(), path.display()),
         mgr.export_env(&path, &items),
-    )
+    )?;
+    if let Err(e) = mgr.remember_export_dir(&path) {
+        log::warn!("Couldn't remember the export folder: {e}");
+    }
+    Ok(report)
+}
+
+#[tauri::command]
+pub async fn recent_export_folders(mgr: State<'_, EnvManager>) -> CmdResult<Vec<PathBuf>> {
+    Ok(mgr.recent_export_dirs())
 }
 
 #[derive(Serialize)]

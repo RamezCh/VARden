@@ -223,3 +223,41 @@ export const profileApi = {
   apply: (id: string, scope: Scope) => invoke<ProfileResult>("apply_profile", { id, scope }),
   deactivate: () => invoke<ProfileResult>("deactivate_profile"),
 };
+
+// ----- Stage 4: editing tools -----
+
+export interface PathEntry {
+  /** As written: %USERPROFILE%\\bin, $HOME/bin. */
+  value: string;
+  /** The folder it points to, when different from value. */
+  expanded: string | null;
+  /** The folder could be checked (absolute, no unknown variables). */
+  checked: boolean;
+  missing: boolean;
+  /** An earlier PATH entry already points to the same folder. */
+  duplicate: boolean;
+}
+
+export interface PathInfo {
+  separator: string;
+  /** Your entries: the only part that can change. */
+  entries: PathEntry[];
+  /** Where the system PATH sits among your entries (0: before them). */
+  baseAt: number;
+  /** Can your entries go before the system PATH? (Not on Windows.) */
+  baseMovable: boolean;
+  /** The read-only system part. */
+  base: PathEntry[];
+  note: string | null;
+}
+
+export const editApi = {
+  deleteVariables: (items: ExportItem[]) => invoke<MutationResult>("delete_variables", { items }),
+  renameVariable: (from: string, to: string, scope: Scope) =>
+    invoke<MutationResult>("rename_variable", { from, to, scope }),
+  pathInfo: () => invoke<PathInfo>("get_path_info"),
+  checkPathEntries: (entries: string[], baseAt: number) =>
+    invoke<PathInfo>("check_path_entries", { entries, baseAt }),
+  setUserPath: (entries: string[], baseAt: number) => invoke<MutationResult>("set_user_path", { entries, baseAt }),
+  recentExportFolders: () => invoke<string[]>("recent_export_folders"),
+};

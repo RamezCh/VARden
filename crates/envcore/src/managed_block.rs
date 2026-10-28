@@ -118,10 +118,23 @@ impl Block {
 
     /// Insert or replace `key`, keeping its original position if it existed.
     pub fn set(&mut self, key: &str, value: &str) {
-        let new = BlockLine::Entry {
-            key: key.to_string(),
-            value: value.to_string(),
-        };
+        self.set_line(
+            key,
+            BlockLine::Entry {
+                key: key.to_string(),
+                value: value.to_string(),
+            },
+        );
+    }
+
+    /// Write a raw shell expression for `key` (kept verbatim), replacing any
+    /// earlier assignment in place.
+    pub fn set_expression(&mut self, syntax: Syntax, key: &str, text: String) {
+        let line = parse_line(&text, syntax);
+        self.set_line(key, line);
+    }
+
+    fn set_line(&mut self, key: &str, new: BlockLine) {
         let mut placed = false;
         self.lines.retain_mut(|line| {
             let matches = match line {

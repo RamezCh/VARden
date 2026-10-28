@@ -43,7 +43,38 @@ export interface TableProps {
   busy: boolean;
   onSet: (key: string, value: string, scope: Scope, existed: boolean) => Promise<boolean>;
   onDelete: (key: string, scope: Scope) => Promise<boolean>;
+  onRename: (from: string, to: string, scope: Scope) => Promise<boolean>;
+  /** PATH (user scope) opens the PATH editor instead of inline editing. */
+  onEditPath: () => void;
+  caseInsensitive: boolean;
+  selected: ReadonlySet<string>;
+  onToggleSelect: (v: EnvVar) => void;
+  /** Select or clear every row shown. */
+  onToggleAll: () => void;
   empty: ReactNode;
+}
+
+const checkbox = "h-4 w-4 shrink-0 cursor-pointer accent-[var(--color-process)]";
+
+function SelectAll({ rows, selected, onToggleAll }: Pick<TableProps, "rows" | "selected" | "onToggleAll">) {
+  const ref = useRef<HTMLInputElement>(null);
+  const picked = rows.filter((v) => selected.has(rowId(v))).length;
+  const all = rows.length > 0 && picked === rows.length;
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = picked > 0 && !all;
+  }, [picked, all]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      aria-label={all ? "Clear selection" : "Select all shown"}
+      title={all ? "Clear selection" : "Select all shown"}
+      className={checkbox}
+      checked={all}
+      disabled={rows.length === 0}
+      onChange={onToggleAll}
+    />
+  );
 }
 
 export function VariableTable(props: TableProps) {
@@ -70,7 +101,10 @@ export function VariableTable(props: TableProps) {
   return (
     <div role="table" aria-label="Environment variables" className="overflow-hidden rounded-lg border border-rule bg-panel">
       <div role="row" className={`${ROW} hidden border-b border-rule text-[0.8rem] text-muted lg:grid`}>
-        {header("Name", "key", "")}
+        <div className="flex items-center gap-3">
+          <SelectAll rows={rows} selected={props.selected} onToggleAll={props.onToggleAll} />
+          {header("Name", "key", "")}
+        </div>
         {header("Value", null, "")}
         <div className="flex items-center gap-1.5">
           {header("Scope", "scope", "")}
@@ -99,7 +133,8 @@ export function VariableTable(props: TableProps) {
               {...props}
               onEdit={() => {
                 setConfirming(null);
-                setEditing(id);
+                if (isPathVar(v, props.caseInsensitive)) props.onEditPath();
+                else setEditing(id);
               }}
               onAskDelete={() => {
                 setEditing(null);
@@ -140,6 +175,9 @@ function PathProblems({ v, hidden }: { v: EnvVar; hidden: boolean }) {
   );
 }
 
+export const isPathVar = (v: Pick<EnvVar, "key" | "scope">, caseInsensitive: boolean) =>
+  v.scope === "user" && (caseInsensitive ? v.key.toUpperCase() : v.key) === "PATH";
+
 function ScopeCell({ scope }: { scope: Scope }) {
   return (
     <span className="text-sm text-muted" title={SCOPE_HELP[scope]}>
@@ -154,12 +192,26 @@ function ViewRow({
   onToggleReveal,
   onEdit,
   onAskDelete,
+  selected,
+  onToggleSelect,
+  caseInsensitive,
 }: TableProps & { v: EnvVar; onEdit: () => void; onAskDelete: () => void }) {
   const revealed = isRevealed(v);
+  const picked = selected.has(rowId(v));
+  const isPath = isPathVar(v, caseInsensitive);
   return (
-    <div role="row" className={`${ROW} hover:bg-raised/40`}>
-      <div role="cell" className={`${C.key} truncate font-mono text-[0.9rem] font-medium`} title={v.key}>
-        {v.key}
+    <div role="row" aria-selected={picked} className={`${ROW} ${picked ? "bg-process/[0.07]" : "hover:bg-raised/40"}`}>
+      <div role="cell" className={`${C.key} flex items-center gap-3`}>
+        <input
+          type="checkbox"
+          aria-label={`Select ${v.key}`}
+          className={checkbox}
+          checked={picked}
+          onChange={() => onToggleSelect(v)}
+        />
+        <span className="truncate font-mono text-[0.9rem] font-medium" title={v.key}>
+          {v.key}
+        </span>
       </div>
       <div role="cell" className={C.value}>
         <SecretValue value={v.value} sensitive={v.sensitive} revealed={revealed} onToggle={() => onToggleReveal(v)} />
@@ -188,7 +240,7 @@ function ViewRow({
         <StatusPill status={v.status} />
       </div>
       <div role="cell" className={C.actions}>
-        <IconButton label={`Edit ${v.key}`} onClick={onEdit}>
+        <IconButton label={isPath ? "Edit PATH in the PATH editor" : `Edit ${v.key}`} onClick={onEdit}>
           <PencilIcon />
         </IconButton>
         <IconButton label={`Delete ${v.key}`} onClick={onAskDelete} className="hover:text-missing">
@@ -268,19 +320,68 @@ const enterEscape = (save: () => void, cancel: () => void) => (e: KeyboardEvent)
   }
 };
 
-function EditRow({ v, busy, onSet, onDone }: TableProps & { v: EnvVar; onDone: () => void }) {
+function EditRow({
+  v,
+  allVars,
+  busy,
+  onSet,
+  onRename,
+  caseInsensitive,
+  onDone,
+}: TableProps & { v: EnvVar; onDone: () => void }) {
+  const [key, setKey] = useState(v.key);
   const [value, setValue] = useState(v.value);
   // A temporary variable can be promoted to user scope; the reverse would
   // silently delete saved data, so it isn't offered here.
   const [scope, setScope] = useState<Scope>(v.scope);
+
+  const newKey = key.trim();
+  const renamed = newKey !== v.key;
+  const norm = (k: string) => (caseInsensitive ? k.toUpperCase() : k);
+  const keyProblem = !renamed
+    ? null
+    : keyError(newKey) ??
+      (caseInsensitive && norm(newKey) === norm(v.key)
+        ? "Windows ignores upper/lower case in names, so this wouldn't change anything."
+        : allVars.some((x) => x.scope === v.scope && x !== v && norm(x.key) === norm(newKey))
+          ? `${newKey} already exists.`
+          : null);
+
   const save = async () => {
-    if (await onSet(v.key, value, scope, scope === v.scope)) onDone();
+    if (keyProblem) return;
+    if (renamed && !(await onRename(v.key, newKey, v.scope))) return;
+    if (value !== v.value || scope !== v.scope) {
+      if (!(await onSet(newKey, value, scope, scope === v.scope))) return;
+    }
+    onDone();
   };
   const keys = enterEscape(() => void save(), onDone);
   return (
-    <div role="row" className={`${ROW} bg-raised/50`}>
-      <div role="cell" className={`${C.key} truncate font-mono text-[0.9rem] font-medium`}>
-        {v.key}
+    <div role="row" className={`${ROW} bg-raised/50 lg:items-start lg:py-3`}>
+      <div role="cell" className={`${C.key} col-span-2 lg:col-span-1`}>
+        <input
+          aria-label={`Name of ${v.key}`}
+          aria-invalid={Boolean(keyProblem)}
+          className={input}
+          value={key}
+          spellCheck={false}
+          autoComplete="off"
+          // Shell expressions are kept verbatim in the startup file; renaming
+          // them safely needs a person.
+          disabled={v.kind === "expression"}
+          title={
+            v.kind === "expression"
+              ? "This value is a shell expression in your startup file. Rename it there by hand."
+              : "Change the name to rename the variable"
+          }
+          onChange={(e) => setKey(e.target.value)}
+          onKeyDown={keys}
+        />
+        {keyProblem ? (
+          <p className="mt-1 text-xs text-missing">{keyProblem}</p>
+        ) : renamed ? (
+          <p className="mt-1 text-xs text-muted">Renames {v.key}, keeping its value.</p>
+        ) : null}
       </div>
       <div role="cell" className={C.value}>
         <ValueInput label={`Value of ${v.key}`} value={value} onChange={setValue} sensitive={v.sensitive} onKeyDown={keys} autoFocus />
@@ -296,7 +397,7 @@ function EditRow({ v, busy, onSet, onDone }: TableProps & { v: EnvVar; onDone: (
         <Button variant="quiet" onClick={onDone}>
           Cancel
         </Button>
-        <Button variant="primary" disabled={busy} onClick={() => void save()}>
+        <Button variant="primary" disabled={busy || Boolean(keyProblem)} onClick={() => void save()}>
           Save
         </Button>
       </div>

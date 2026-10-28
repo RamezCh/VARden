@@ -14,6 +14,7 @@ mod fsutil;
 pub mod managed_block;
 pub mod manager;
 pub mod model;
+pub mod path_editor;
 pub mod paths;
 pub mod profiles;
 pub mod shells;

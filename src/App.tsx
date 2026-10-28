@@ -11,6 +11,7 @@ import { Toasts } from "./components/Toasts";
 import { VariablesView } from "./components/VariablesView";
 import { api, syncApi, type EnvVar, type PlatformInfo, type Profile } from "./lib/api";
 import { ProfileEditor } from "./components/ProfileEditor";
+import { PathEditor } from "./components/PathEditor";
 import { ProfilesView } from "./components/ProfilesView";
 import { pickEnvFile, pickExportPath, useFileDrop } from "./lib/files";
 import { formatShort, useEnvironment } from "./lib/useEnvironment";
@@ -41,6 +42,7 @@ export default function App() {
   const [exporting, setExporting] = useState<EnvVar[] | null>(null);
   const [editingProfile, setEditingProfile] = useState<Profile | "new" | null>(null);
   const [dropHover, setDropHover] = useState(false);
+  const [editingPath, setEditingPath] = useState(false);
 
   const loadEnvFile = useCallback(
     async (path: string) => {
@@ -164,6 +166,10 @@ export default function App() {
               searchRef={searchRef}
               onSet={env.setVariable}
               onDelete={env.deleteVariable}
+              onDeleteMany={env.deleteVariables}
+              onRename={env.renameVariable}
+              onEditPath={() => setEditingPath(true)}
+              caseInsensitive={env.platform?.os === "windows"}
               onOpenImport={() => setImporting("picking")}
               onOpenExport={setExporting}
               hooksInstalled={hooksInstalled}
@@ -220,6 +226,15 @@ export default function App() {
         />
       )}
 
+      {editingPath && (
+        <PathEditor
+          windows={env.platform?.os === "windows"}
+          busy={env.busy}
+          onClose={() => setEditingPath(false)}
+          onSave={env.saveUserPath}
+        />
+      )}
+
       {importing && (
         <ImportModal
           source={importing === "picking" ? null : importing}
@@ -237,8 +252,8 @@ export default function App() {
           initial={exporting}
           busy={env.busy}
           onClose={() => setExporting(null)}
-          onExport={async (items) => {
-            const path = await pickExportPath();
+          onExport={async (items, dir) => {
+            const path = await pickExportPath(dir);
             return path ? env.exportVariables(path, items) : false;
           }}
         />

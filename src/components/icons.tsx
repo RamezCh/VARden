@@ -80,3 +80,24 @@ export const SyncIcon = (p: P) => (
     <path d="M2.5 6.5A5.5 5.5 0 0 1 12.6 4.2M13.5 2v2.5H11M13.5 9.5A5.5 5.5 0 0 1 3.4 11.8M2.5 14v-2.5H5" />
   </svg>
 );
+export const ArrowUpIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" />
+  </svg>
+);
+export const ArrowDownIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M8 3v10M3.5 8.5 8 13l4.5-4.5" />
+  </svg>
+);
+export const LockIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="3" y="7" width="10" height="7" rx="1.5" />
+    <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+  </svg>
+);
+export const FolderIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M1.5 4.5a1 1 0 0 1 1-1h3.6l1.5 1.5h5.9a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1Z" />
+  </svg>
+);

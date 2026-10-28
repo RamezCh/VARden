@@ -44,7 +44,13 @@ struct Settings {
     /// Startup files chosen on macOS/Linux (`None`: the login shell's).
     #[serde(default)]
     startup_files: Option<Vec<ShellTarget>>,
+    /// Folders .env files were last exported to, newest first.
+    #[serde(default)]
+    recent_export_dirs: Vec<PathBuf>,
 }
+
+/// How many recent export folders to remember.
+pub const RECENT_EXPORT_DIRS: usize = 5;
 
 /// One variable that a restore would change.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -402,6 +408,57 @@ impl EnvManager {
         }
     }
 
+    /// Delete several variables in one scope with a single backup.
+    pub fn remove_many(&self, keys: &[String], scope: Scope) -> Result<Vec<BackupOutcome>> {
+        let reason = match keys {
+            [one] => format!("Before removing {one}"),
+            _ => format!("Before removing {} variables", keys.len()),
+        };
+        let changes: Vec<(String, Option<String>)> =
+            keys.iter().map(|k| (k.clone(), None)).collect();
+        self.apply_changes(&changes, scope, &reason)
+    }
+
+    /// Rename a variable, keeping its value, with a single backup.
+    pub fn rename(&self, from: &str, to: &str, scope: Scope) -> Result<Vec<BackupOutcome>> {
+        validate_key(to)?;
+        if from == to {
+            return Ok(Vec::new());
+        }
+        if self.ci && from.eq_ignore_ascii_case(to) {
+            return Err(Error::Refused(
+                "Windows treats names that differ only in upper/lower case as the same variable."
+                    .into(),
+            ));
+        }
+        let kind = match scope {
+            Scope::User => self
+                .persistent()?
+                .into_iter()
+                .find(|v| v.key == from || (self.ci && v.key.eq_ignore_ascii_case(from)))
+                .map(|v| v.kind),
+            Scope::Process => Some(crate::model::ValueKind::String),
+        };
+        if kind == Some(crate::model::ValueKind::Expression) {
+            return Err(Error::Refused(format!(
+                "{from} is a shell expression in your startup file. Rename it there by hand."
+            )));
+        }
+        let Some(value) = self.current_value(from, scope)? else {
+            return Err(Error::Refused(format!("{from} doesn't exist any more.")));
+        };
+        if self.current_value(to, scope)?.is_some() {
+            return Err(Error::Refused(format!(
+                "{to} already exists. Delete it first, or pick another name."
+            )));
+        }
+        self.apply_changes(
+            &[(from.to_string(), None), (to.to_string(), Some(value))],
+            scope,
+            &format!("Before renaming {from} to {to}"),
+        )
+    }
+
     fn remove_overlay(&self, key: &str) {
         let ci = self.ci;
         lock(&self.overlay).retain(|k, _| {
@@ -449,6 +506,32 @@ impl EnvManager {
         let mut settings = self.load_settings();
         settings.startup_files = Some(self.shell_targets());
         fsutil::write_atomic(&self.settings_path, &serde_json::to_vec_pretty(&settings)?)
+    }
+
+    // ----- recent export folders -----
+
+    /// Folders .env files were recently exported to (newest first), skipping
+    /// any that no longer exist.
+    pub fn recent_export_dirs(&self) -> Vec<PathBuf> {
+        self.load_settings()
+            .recent_export_dirs
+            .into_iter()
+            .filter(|d| d.is_dir())
+            .take(RECENT_EXPORT_DIRS)
+            .collect()
+    }
+
+    /// Remember the folder of a file just exported to.
+    pub fn remember_export_dir(&self, file: &Path) -> Result<Vec<PathBuf>> {
+        let Some(dir) = file.parent().filter(|d| !d.as_os_str().is_empty()) else {
+            return Ok(self.recent_export_dirs());
+        };
+        let mut settings = self.load_settings();
+        settings.recent_export_dirs.retain(|d| d != dir);
+        settings.recent_export_dirs.insert(0, dir.to_path_buf());
+        settings.recent_export_dirs.truncate(RECENT_EXPORT_DIRS);
+        fsutil::write_atomic(&self.settings_path, &serde_json::to_vec_pretty(&settings)?)?;
+        Ok(self.recent_export_dirs())
     }
 
     // ----- backups -----
@@ -775,5 +858,111 @@ mod tests {
         assert_eq!(targets.len(), 2);
         assert_eq!(targets[1].path, fish);
         assert_eq!(targets[1].syntax, Some(Syntax::Fish));
+    }
+
+    #[test]
+    fn rename_keeps_value_with_one_backup() {
+        let (_dir, m) = setup();
+        m.set("OLD", "v", Scope::User).unwrap();
+        m.set("TAKEN", "t", Scope::User).unwrap();
+        assert_eq!(m.rename("OLD", "NEW", Scope::User).unwrap().len(), 1);
+        assert_eq!(
+            m.current_value("NEW", Scope::User).unwrap().as_deref(),
+            Some("v")
+        );
+        assert_eq!(m.current_value("OLD", Scope::User).unwrap(), None);
+        assert!(matches!(
+            m.rename("NEW", "TAKEN", Scope::User),
+            Err(Error::Refused(_))
+        ));
+        assert!(m.rename("NEW", "BAD-NAME", Scope::User).is_err());
+        assert!(matches!(
+            m.rename("GONE", "X", Scope::User),
+            Err(Error::Refused(_))
+        ));
+
+        m.set("TMP", "1", Scope::Process).unwrap();
+        m.rename("TMP", "TMP2", Scope::Process).unwrap();
+        assert_eq!(
+            m.process_overlay().get("TMP2").map(String::as_str),
+            Some("1")
+        );
+    }
+
+    #[test]
+    fn bulk_delete_takes_one_backup() {
+        let (_dir, m) = setup();
+        let entries: Vec<(String, String)> = ["A", "B", "C"]
+            .iter()
+            .map(|k| (k.to_string(), "1".to_string()))
+            .collect();
+        m.set_many(&entries, Scope::User).unwrap();
+        let taken = m
+            .remove_many(&["A".into(), "C".into()], Scope::User)
+            .unwrap();
+        assert_eq!(taken.len(), 1);
+        assert_eq!(taken[0].reason, "Before removing 2 variables");
+        let keys: Vec<String> = m.list(&[]).unwrap().into_iter().map(|r| r.key).collect();
+        assert_eq!(keys, ["B"]);
+    }
+
+    #[test]
+    fn remembers_five_recent_export_folders() {
+        let (dir, m) = setup();
+        for i in 0..7 {
+            let d = dir.path().join(format!("p{i}"));
+            std::fs::create_dir(&d).unwrap();
+            m.remember_export_dir(&d.join(".env")).unwrap();
+        }
+        // Exporting to p3 again moves it to the front.
+        let recent = m
+            .remember_export_dir(&dir.path().join("p3").join(".env"))
+            .unwrap();
+        let names: Vec<String> = recent
+            .iter()
+            .map(|d| d.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(names, ["p3", "p6", "p5", "p4", "p2"]);
+        std::fs::remove_dir(dir.path().join("p6")).unwrap();
+        assert_eq!(m.recent_export_dirs().len(), 4);
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn path_editor_never_replaces_the_system_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let rc = dir.path().join(".bashrc");
+        let bin = dir.path().join("bin");
+        std::fs::create_dir(&bin).unwrap();
+        let m = EnvManager::with_stores(
+            BackupStore::new(dir.path().join("backups")),
+            EnvSnapshot::from_pairs([("HOME", "/h"), ("PATH", "/usr/bin:/bin")], false),
+            vec![Arc::new(ShellFileStore::new(&rc, Syntax::Posix))],
+        );
+        let info = m.path_info().unwrap();
+        assert!(info.entries.is_empty());
+        assert_eq!(info.base.len(), 2);
+
+        let mine = vec![bin.to_string_lossy().into_owned(), "~/gone".to_string()];
+        assert_eq!(m.set_user_path(&mine, 1).unwrap().len(), 1);
+        let content = std::fs::read_to_string(&rc).unwrap();
+        assert!(
+            content.contains(&format!(
+                "export PATH=\"{}:$PATH:$HOME/gone\"",
+                bin.display()
+            )),
+            "{content}"
+        );
+
+        let info = m.path_info().unwrap();
+        assert_eq!(info.base_at, 1);
+        assert_eq!(info.entries[1].value, "$HOME/gone");
+        assert!(!info.entries[0].missing);
+        assert!(info.entries[1].missing);
+        assert_eq!(info.entries[1].expanded.as_deref(), Some("/h/gone"));
+
+        // Removing every entry removes the line.
+        m.set_user_path(&[], 0).unwrap();
+        assert!(!std::fs::read_to_string(&rc).unwrap().contains("PATH"));
     }
 }

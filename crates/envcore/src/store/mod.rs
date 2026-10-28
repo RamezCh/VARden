@@ -62,6 +62,18 @@ pub trait PersistentStore: Send + Sync {
         self.update_many(&changes, reason, backups)
     }
 
+    /// Write `line` (a shell expression assigning `key`) verbatim, or remove
+    /// `key` when `None`. Only startup files support this.
+    fn set_expression(
+        &self,
+        _key: &str,
+        _line: Option<String>,
+        _reason: &str,
+        _backups: &BackupStore,
+    ) -> Result<Option<BackupOutcome>> {
+        Err(crate::Error::Unsupported("writing shell expressions"))
+    }
+
     /// Delete `key`. Returns the backup taken, or `None` if it wasn't there.
     fn remove(&self, key: &str, backups: &BackupStore) -> Result<Option<BackupOutcome>>;
 }

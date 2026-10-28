@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
+  editApi,
   profileApi,
   syncApi,
   type BackupEntry,
@@ -211,6 +212,27 @@ export function useEnvironment(notify: Notify, openBackups: () => void) {
     [mutate],
   );
 
+  const deleteVariables = useCallback(
+    (items: ExportItem[]) =>
+      mutate(() => editApi.deleteVariables(items), `Deleted ${plural(items.length, "variable")}.`),
+    [mutate],
+  );
+
+  const renameVariable = useCallback(
+    (from: string, to: string, scope: Scope) =>
+      mutate(() => editApi.renameVariable(from, to, scope), `Renamed ${from} to ${to.trim()}.`),
+    [mutate],
+  );
+
+  const saveUserPath = useCallback(
+    (entries: string[], baseAt: number) =>
+      mutate(
+        () => editApi.setUserPath(entries, baseAt),
+        "Saved your PATH. New terminals and apps pick it up; sync to update open terminals.",
+      ),
+    [mutate],
+  );
+
   const restoreBackup = useCallback(
     (backup: BackupEntry) =>
       mutate(() => api.restoreBackup(backup.id), `Restored the backup from ${formatWhen(backup.createdAt)}.`),
@@ -410,6 +432,9 @@ export function useEnvironment(notify: Notify, openBackups: () => void) {
     refresh,
     setVariable,
     deleteVariable,
+    deleteVariables,
+    renameVariable,
+    saveUserPath,
     restoreBackup,
     deleteBackups,
     profiles,

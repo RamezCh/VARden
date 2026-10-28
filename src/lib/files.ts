@@ -18,8 +18,20 @@ export async function pickStartupFile(): Promise<string | null> {
   return typeof picked === "string" ? picked : null;
 }
 
-export async function pickExportPath(): Promise<string | null> {
-  return save({ defaultPath: ".env", filters: FILTERS, title: "Export variables" });
+/** Join a folder and a file name with the folder's own separator. */
+export const joinPath = (dir: string, name: string) => {
+  const sep = dir.includes("\\") && !dir.includes("/") ? "\\" : "/";
+  return dir.endsWith(sep) ? dir + name : dir + sep + name;
+};
+
+/** Opens the save dialog, starting in `dir` when given. */
+export async function pickExportPath(dir?: string): Promise<string | null> {
+  return save({ defaultPath: dir ? joinPath(dir, ".env") : ".env", filters: FILTERS, title: "Export variables" });
+}
+
+export async function pickFolder(title: string): Promise<string | null> {
+  const picked = await open({ multiple: false, directory: true, title });
+  return typeof picked === "string" ? picked : null;
 }
 
 export const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;

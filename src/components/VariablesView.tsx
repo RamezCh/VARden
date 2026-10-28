@@ -1,4 +1,5 @@
 import { useState, type RefObject } from "react";
+import type { ExportItem } from "../lib/api";
 import type { ActiveProfile, EnvVar, Scope, Status } from "../lib/api";
 import { countByStatus, filterVars, rowId, sortVars, type ScopeFilter, type SortKey, type SortState } from "../lib/filter";
 import { Button } from "./IconButton";
@@ -17,6 +18,10 @@ interface Props {
   searchRef: RefObject<HTMLInputElement | null>;
   onSet: (key: string, value: string, scope: Scope, existed: boolean) => Promise<boolean>;
   onDelete: (key: string, scope: Scope) => Promise<boolean>;
+  onDeleteMany: (items: ExportItem[]) => Promise<boolean>;
+  onRename: (from: string, to: string, scope: Scope) => Promise<boolean>;
+  onEditPath: () => void;
+  caseInsensitive: boolean;
   onOpenImport: () => void;
   onOpenExport: (visible: EnvVar[]) => void;
   /** Number of shells with the terminal-sync hook installed. */
@@ -42,6 +47,10 @@ export function VariablesView({
   searchRef,
   onSet,
   onDelete,
+  onDeleteMany,
+  onRename,
+  onEditPath,
+  caseInsensitive,
   onOpenImport,
   onOpenExport,
   hooksInstalled,
@@ -56,6 +65,8 @@ export function VariablesView({
   const [sort, setSort] = useState<SortState>({ key: "key", dir: "asc" });
   const [revealAll, setRevealAll] = useState(false);
   const [revealed, setRevealed] = useState<ReadonlySet<string>>(new Set());
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [confirmBulk, setConfirmBulk] = useState(false);
 
   const isRevealed = (v: EnvVar) => revealAll || revealed.has(rowId(v));
   const isVisible = (v: EnvVar) => !v.sensitive || isRevealed(v);
@@ -66,6 +77,33 @@ export function VariablesView({
   const pending = vars.filter((v) => v.pendingSync).length;
   const rows = sortVars(filterVars(vars, { query, scope, statuses }, isVisible), sort);
   const filtered = query.trim() !== "" || scope !== "all" || statuses.size > 0;
+  // Rows that disappear (deleted, renamed) drop out of the selection.
+  const picked = vars.filter((v) => selected.has(rowId(v)));
+  const pickedSaved = picked.filter((v) => v.scope === "user").length;
+
+  const toggleSelect = (v: EnvVar) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const id = rowId(v);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const toggleAll = () =>
+    setSelected((prev) => {
+      const shown = rows.map(rowId);
+      const all = shown.length > 0 && shown.every((id) => prev.has(id));
+      const next = new Set(prev);
+      shown.forEach((id) => (all ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  const clearSelection = () => {
+    setSelected(new Set());
+    setConfirmBulk(false);
+  };
+  const deletePicked = async () => {
+    if (await onDeleteMany(picked.map(({ key, scope }) => ({ key, scope })))) clearSelection();
+  };
 
   const toggleStatus = (s: Status) =>
     setStatuses((prev) => {
@@ -110,6 +148,9 @@ export function VariablesView({
           <p className="mt-1 text-sm text-muted">Your saved user variables, plus temporary ones for open terminals.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={onEditPath} title="Add, remove or reorder the folders in your PATH">
+            Edit PATH
+          </Button>
           <Button onClick={onOpenImport}>Import .env</Button>
           <Button onClick={() => onOpenExport(rows)} disabled={vars.length === 0}>
             Export .env
@@ -211,6 +252,43 @@ export function VariablesView({
         </Button>
       </div>
 
+      {picked.length > 0 && (
+        <div
+          role="region"
+          aria-label="Selected variables"
+          className={`-mb-3 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+            confirmBulk ? "border-missing/40 bg-missing/[0.07]" : "border-process/40 bg-process/[0.07]"
+          }`}
+          onKeyDown={(e) => e.key === "Escape" && setConfirmBulk(false)}
+        >
+          {confirmBulk ? (
+            <>
+              <span className="mr-auto">
+                Delete {picked.length === 1 ? picked[0].key : `${picked.length} variables`}?{" "}
+                <span className="text-muted">
+                  {pickedSaved > 0
+                    ? "A backup is saved first, and Undo brings them back."
+                    : "Open terminals drop them at the next sync."}
+                </span>
+              </span>
+              <Button onClick={() => setConfirmBulk(false)}>Cancel</Button>
+              <Button variant="danger" disabled={busy} onClick={() => void deletePicked()}>
+                Delete {picked.length}
+              </Button>
+            </>
+          ) : (
+            <>
+              <span className="mr-auto font-semibold">{picked.length} selected</span>
+              <Button onClick={() => onOpenExport(picked)}>Export…</Button>
+              <Button className="hover:text-missing" onClick={() => setConfirmBulk(true)}>
+                Delete…
+              </Button>
+              <Button onClick={clearSelection}>Clear selection</Button>
+            </>
+          )}
+        </div>
+      )}
+
       <VariableTable
         rows={rows}
         allVars={vars}
@@ -237,6 +315,12 @@ export function VariablesView({
         busy={busy}
         onSet={onSet}
         onDelete={onDelete}
+        onRename={onRename}
+        onEditPath={onEditPath}
+        caseInsensitive={caseInsensitive}
+        selected={selected}
+        onToggleSelect={toggleSelect}
+        onToggleAll={toggleAll}
         empty={empty}
       />
 
