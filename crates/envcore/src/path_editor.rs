@@ -525,7 +525,8 @@ mod tests {
             "drive root vs current folder on C"
         );
         assert_eq!(normalise("C:\\tools\\"), normalise("C:\\tools"));
-        assert_eq!(normalise("/"), "/");
+        // The root stays a root (Windows writes it with a backslash).
+        assert_eq!(normalise("/"), if cfg!(windows) { "\\" } else { "/" });
         assert_eq!(normalise("/usr/bin/"), normalise("/usr/bin"));
     }
 
