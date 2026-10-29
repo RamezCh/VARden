@@ -25,7 +25,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Publishing a draft creates its tag, and that tag push starts this workflow
+  # again. Skip the build when the tag already has a published release.
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.check.outputs.build }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ] &&
+             [ "$(gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2>/dev/null)" = "false" ]; then
+            echo "$GITHUB_REF_NAME is already published; nothing to build."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: check
+    if: needs.check.outputs.build == 'true'
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
