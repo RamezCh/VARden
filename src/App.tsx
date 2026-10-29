@@ -173,9 +173,9 @@ export default function App() {
                   ? "Reading…"
                   : env.sync?.lastSyncedAt
                     ? `Terminals synced ${formatShort(env.sync.lastSyncedAt)}`
-                    : "Up to date"}
+                    : "Terminals not synced yet"}
               </span>
-              <IconButton label="Reload from disk (F5)" onClick={() => void env.refresh()} disabled={env.loading}>
+              <IconButton label="Reload variables from disk (F5)" onClick={() => void env.refresh()} disabled={env.loading}>
                 <RefreshIcon />
               </IconButton>
             </div>
