@@ -324,6 +324,13 @@ pub async fn export_env_file(
     path: PathBuf,
     items: Vec<ExportItem>,
 ) -> CmdResult<ExportReport> {
+    // Only files that are recognisably .env files (`.env`, `.env.local`,
+    // `client-a.env`), never a startup file, program or library.
+    if !is_env_file_name(&path) {
+        return Err(Error::Refused(
+            "Name the file .env, .env.something or something.env.".into(),
+        ));
+    }
     let report = logged(
         format!("Exported {} variable(s) to {}", items.len(), path.display()),
         mgr.export_env(&path, &items),
@@ -523,6 +530,14 @@ pub async fn prepare_report(mgr: State<'_, EnvManager>, keep_names: bool) -> Cmd
 
 #[tauri::command]
 pub async fn save_report(path: PathBuf, text: String) -> CmdResult<()> {
+    // The save dialog suggests a .txt file. Refusing anything else means a
+    // bug or injected script in the page can't use this to overwrite a
+    // startup file, a program or a library.
+    if !has_extension(&path, &["txt", "log"]) {
+        return Err(Error::Refused(
+            "Save the report as a .txt or .log file.".into(),
+        ));
+    }
     std::fs::write(&path, text)
         .map_err(|e| Error::Refused(format!("Couldn't save {}: {e}", path.display())))
 }
@@ -539,4 +554,64 @@ pub async fn copy_text(
         .inner()
         .copy(text, secret)
         .map_err(|e| Error::Refused(format!("Couldn't copy: {e}")))
+}
+
+fn has_extension(path: &std::path::Path, allowed: &[&str]) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| allowed.iter().any(|a| e.eq_ignore_ascii_case(a)))
+}
+
+fn is_env_file_name(path: &std::path::Path) -> bool {
+    let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+        return false;
+    };
+    let lower = name.to_ascii_lowercase();
+    let runnable = has_extension(
+        path,
+        &[
+            "exe", "dll", "com", "bat", "cmd", "ps1", "psm1", "sh", "so", "dylib", "lnk",
+        ],
+    );
+    !runnable && (lower == ".env" || lower.starts_with(".env.") || has_extension(path, &["env"]))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn only_env_files_and_text_reports_can_be_written() {
+        for ok in [
+            ".env",
+            ".env.local",
+            "/p/.ENV.production",
+            ".env.production.local",
+            "client-a.env",
+            "C:/x/prod.env",
+        ] {
+            assert!(is_env_file_name(Path::new(ok)), "{ok}");
+        }
+        for bad in [
+            ".bashrc",
+            "profile.ps1",
+            "x.dll",
+            "env",
+            ".envrc",
+            "notes.txt",
+            "a.env.exe",
+            ".env.ps1",
+            ".env.DLL",
+        ] {
+            assert!(!is_env_file_name(Path::new(bad)), "{bad}");
+        }
+        assert!(has_extension(
+            Path::new("varden-report.txt"),
+            &["txt", "log"]
+        ));
+        assert!(has_extension(Path::new("x.LOG"), &["txt", "log"]));
+        assert!(!has_extension(Path::new(".zshrc"), &["txt", "log"]));
+        assert!(!has_extension(Path::new("report.txt.exe"), &["txt", "log"]));
+    }
 }

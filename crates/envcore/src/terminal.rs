@@ -252,6 +252,11 @@ impl EnvManager {
         let mut desired = Desired::default();
         let mut skipped = Vec::new();
         for var in self.persistent()? {
+            // Shells can't assign names like `ProgramFiles(x86)`; leave them out.
+            if crate::validate::validate_key(&var.key).is_err() {
+                skipped.push(var.key);
+                continue;
+            }
             let Some(value) = resolver(&var) else {
                 skipped.push(var.key);
                 continue;

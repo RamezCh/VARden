@@ -280,7 +280,14 @@ fn expand_percent(entry: &str, lookup: &dyn Fn(&str) -> Option<String>) -> Optio
 
 fn normalise(p: &str) -> String {
     let t = p.trim_end_matches(['/', '\\']);
-    let t = if t.is_empty() { p } else { t };
+    // Keep the root itself: `/` stays `/`, and `C:\` stays `C:\` (plain
+    // `C:` means "the current folder on drive C", a different place).
+    let is_drive = t.len() == 2 && t.as_bytes()[0].is_ascii_alphabetic() && t.ends_with(':');
+    let t = if t.is_empty() || (is_drive && t.len() < p.len()) {
+        &p[..t.len() + 1]
+    } else {
+        t
+    };
     if cfg!(windows) {
         t.replace('/', "\\").to_lowercase()
     } else {
@@ -508,6 +515,18 @@ mod tests {
             "USERPROFILE" => Some(r"C:\Users\me".into()),
             _ => None,
         }
+    }
+
+    #[test]
+    fn roots_keep_their_meaning() {
+        assert_ne!(
+            normalise("C:\\"),
+            normalise("C:"),
+            "drive root vs current folder on C"
+        );
+        assert_eq!(normalise("C:\\tools\\"), normalise("C:\\tools"));
+        assert_eq!(normalise("/"), "/");
+        assert_eq!(normalise("/usr/bin/"), normalise("/usr/bin"));
     }
 
     #[test]

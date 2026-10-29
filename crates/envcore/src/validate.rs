@@ -105,13 +105,23 @@ pub struct PathCheck {
     pub missing: Vec<String>,
 }
 
+/// An absolute path on this system. `C:\Tools` is only checked on Windows,
+/// and `/usr/bin` only on macOS and Linux: on Windows `/usr/bin` means
+/// `\usr\bin` on the current drive, which is how Git Bash and MSYS values
+/// look, not a real folder.
 fn is_absolute_path(p: &str) -> bool {
-    let b = p.as_bytes();
-    let windows_drive = b.len() >= 3
-        && b[0].is_ascii_alphabetic()
-        && b[1] == b':'
-        && (b[2] == b'\\' || b[2] == b'/');
-    windows_drive || p.starts_with('/') || p.starts_with("~/") || p == "~"
+    if p.starts_with("~/") || p == "~" {
+        return true; // resolved against the home folder
+    }
+    if cfg!(windows) {
+        let b = p.as_bytes();
+        b.len() >= 3
+            && b[0].is_ascii_alphabetic()
+            && b[1] == b':'
+            && (b[2] == b'\\' || b[2] == b'/')
+    } else {
+        p.starts_with('/')
+    }
 }
 
 /// Network paths can take seconds to time out when unreachable; skip them.
@@ -276,12 +286,16 @@ mod tests {
             check_paths("MY_TOOLS_PATH", &format!("{ok}{sep}{gone}"), sep, home).checked,
             2
         );
-        // Windows drive paths are recognised on every platform.
-        assert_eq!(
-            check_paths("TOOLS", r"Z:\VARden\does\not\exist", ';', home)
-                .missing
-                .len(),
-            1
-        );
+        // Paths of the other system's kind aren't checked: `Z:\...` only on
+        // Windows, `/usr/...` (Git Bash and MSYS style) only elsewhere.
+        let windows_style = check_paths("TOOLS", r"Z:\VARden\does\not\exist", ';', home);
+        let unix_style = check_paths("TOOLS", "/varden/does/not/exist", ':', home);
+        if cfg!(windows) {
+            assert_eq!(windows_style.missing.len(), 1);
+            assert_eq!(unix_style.checked, 0);
+        } else {
+            assert_eq!(windows_style.checked, 0);
+            assert_eq!(unix_style.missing.len(), 1);
+        }
     }
 }

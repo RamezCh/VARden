@@ -143,6 +143,13 @@ The sections below were written as each stage landed. They explain behaviour in 
 - **Desktop.** The first time the window is closed, VARden asks whether to keep running in the tray. On macOS, clicking the Dock icon brings a hidden window back.
 - **Contrast.** The faint text colour meets WCAG AA (4.5:1) in both themes.
 
+### Second review (external audit)
+
+- **`.env` export.** Values with a quote or a line break are written in double quotes, where a shell that sources the file (`set -a; . ./.env`) runs `` `...` ``. Backticks are now escaped like `$`, and a test sources an export in bash to prove nothing runs.
+- **Terminal sync names.** Windows allows names such as `ProgramFiles(x86)` or `MY-VAR`, which no shell can assign by name and which would break the whole sync script. Only plain names reach the scripts; others are left out and reported.
+- **File-writing commands.** `save_report` only writes `.txt` or `.log` files and `export_env_file` only `.env`-style names, so a bug or injected script in the page can't use them to overwrite a startup file or a program.
+- **Smaller fixes.** Hand-written PowerShell quote pairs like `‘'` now read as PowerShell reads them (the second character; checked against pwsh), path checks only look at paths of this system's kind (Git Bash style `/usr/bin` on Windows is no longer flagged), `C:\` stays distinct from `C:` in the PATH editor, files at the top of old app folders are moved during the rename migration instead of deleted, and Windows setting-change broadcasts are folded together during bursts of saves.
+
 ### Security and upkeep
 
 - **Clipboard.** `copy_text` (`src-tauri/src/clipboard.rs`) writes through `arboard`. For secrets it asks Windows to keep the entry out of clipboard history and cloud sync (`ExcludeClipboardContentFromMonitorProcessing`, `CanIncludeInClipboardHistory`, `CanUploadToCloudClipboard`), and a background thread clears it after 30 seconds unless something else was copied since (a generation counter plus a comparison with the current text).

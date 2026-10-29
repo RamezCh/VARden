@@ -25,6 +25,7 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::validate::validate_key;
 use crate::{Error, Result, fsutil};
 
 pub const GENERATION_FILE: &str = "generation";
@@ -120,12 +121,22 @@ pub fn plan(
         }
     };
 
-    let wanted: BTreeSet<String> = desired.vars.iter().map(|(k, _)| norm(k)).collect();
+    // Names are written into shell code as they are, so only plain names
+    // (letters, digits, underscores) may get there. Windows allows names like
+    // `ProgramFiles(x86)` or `MY-VAR`, which no shell can assign that way.
+    let ok_name = |k: &str| validate_key(k).is_ok();
+    let vars: Vec<(String, String)> = desired
+        .vars
+        .iter()
+        .filter(|(k, _)| ok_name(k))
+        .cloned()
+        .collect();
+    let wanted: BTreeSet<String> = vars.iter().map(|(k, _)| norm(k)).collect();
     let mut removed: BTreeSet<String> = previous
         .removed
         .iter()
         .chain(previous.synced.keys())
-        .filter(|k| !wanted.contains(&norm(k)))
+        .filter(|k| ok_name(k) && !wanted.contains(&norm(k)))
         .cloned()
         .collect();
     // Keep one spelling per variable.
@@ -152,13 +163,13 @@ pub fn plan(
     let state = SyncState {
         generation: previous.generation + 1,
         synced_at: Some(Utc::now()),
-        synced: desired.vars.iter().cloned().collect(),
+        synced: vars.iter().cloned().collect(),
         removed,
         path: desired.path.clone(),
         removed_path: path_remove.iter().cloned().collect(),
     };
     Plan {
-        set: desired.vars.clone(),
+        set: vars,
         unset,
         path_add: desired.path.clone(),
         path_remove,
@@ -443,6 +454,37 @@ pub fn publish(sync_dir: &Path, plan: &Plan) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn names_shells_cannot_assign_never_reach_the_scripts() {
+        let bad = [
+            "ProgramFiles(x86)",
+            "MY-VAR",
+            "X; Start-Process calc; $env:Y",
+            "A B",
+        ];
+        let mut vars: Vec<(&str, &str)> = bad.iter().map(|k| (*k, "v")).collect();
+        vars.push(("GOOD", "v"));
+        let p1 = plan(
+            &desired(&vars, &[]),
+            &SyncState::default(),
+            &BTreeMap::new(),
+            true,
+        );
+        assert_eq!(p1.set, vec![("GOOD".to_string(), "v".to_string())]);
+
+        // An older state that somehow holds such names doesn't unset them either.
+        let mut old = p1.state.clone();
+        old.removed.extend(bad.iter().map(|k| k.to_string()));
+        let p2 = plan(&desired(&[], &[]), &old, &BTreeMap::new(), true);
+        assert_eq!(p2.unset, vec![("GOOD".to_string(), None)]);
+        for shell in HookShell::ALL {
+            let script = render_apply(shell, &p2);
+            for k in bad {
+                assert!(!script.contains(k), "{shell:?}: {script}");
+            }
+        }
+    }
 
     fn desired(vars: &[(&str, &str)], path: &[&str]) -> Desired {
         Desired {

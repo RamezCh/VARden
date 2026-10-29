@@ -344,7 +344,9 @@ fn ps_single_unquote(inner: &str) -> Option<String> {
     while let Some(c) = chars.next() {
         if PS_SINGLE_QUOTES.contains(&c) {
             match chars.next() {
-                Some(d) if PS_SINGLE_QUOTES.contains(&d) => out.push(c),
+                // PowerShell reads a pair of quote characters as one, and
+                // keeps the second (`‘'` gives `'`). Checked against pwsh.
+                Some(d) if PS_SINGLE_QUOTES.contains(&d) => out.push(d),
                 _ => return None,
             }
         } else {
@@ -688,6 +690,23 @@ mod tests {
             assert!(read_block(&bad, Syntax::Posix).is_err(), "{bad}");
             assert!(write_block(&bad, Syntax::Posix, &b).is_err(), "{bad}");
         }
+    }
+
+    #[test]
+    fn powershell_quote_pairs_read_like_powershell_does() {
+        // Our own output: every quote character doubled, read back exactly.
+        for v in ["It’s", "‘a’", "x‚‛'y", "''"] {
+            let q = ps_single_quote(v);
+            assert_eq!(ps_single_unquote(&q[1..q.len() - 1]).as_deref(), Some(v));
+        }
+        // Hand-written mixed pairs: PowerShell keeps the second character.
+        assert_eq!(ps_single_unquote("a‘'b").as_deref(), Some("a'b"));
+        assert_eq!(ps_single_unquote("a'’b").as_deref(), Some("a’b"));
+        assert_eq!(
+            ps_single_unquote("a’b"),
+            None,
+            "a lone quote ends the string"
+        );
     }
 
     #[test]

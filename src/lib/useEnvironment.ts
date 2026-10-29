@@ -396,7 +396,7 @@ export function useEnvironment(notify: Notify, openBackups: () => void) {
       if (report.skipped.length > 0) {
         notify(
           "info",
-          `${report.skipped.join(", ")} use${report.skipped.length === 1 ? "s" : ""} shell expressions, so only new terminals get ${
+          `${report.skipped.join(", ")} can't be pushed into open terminals (a shell expression, or a name shells can't set), so only new terminals get ${
             report.skipped.length === 1 ? "it" : "them"
           }.`,
         );

@@ -208,27 +208,51 @@ impl PersistentStore for RegistryStore {
 
 /// Tell running programs (Explorer in particular) that the user environment
 /// changed. Runs on a background thread: a broadcast waits on every top-level
-/// window and must never block the UI.
+/// window and must never block the UI. Calls that arrive while a broadcast is
+/// running are folded into one more broadcast afterwards, so a burst of saves
+/// never piles up waiting threads.
 pub fn broadcast_environment_change() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static PENDING: AtomicBool = AtomicBool::new(false);
+    static RUNNING: AtomicBool = AtomicBool::new(false);
+
+    PENDING.store(true, Ordering::SeqCst);
+    if RUNNING.swap(true, Ordering::SeqCst) {
+        return; // the running thread sends again when it's done
+    }
     std::thread::spawn(|| {
-        use windows_sys::Win32::UI::WindowsAndMessaging::{
-            HWND_BROADCAST, SMTO_ABORTIFHUNG, SendMessageTimeoutW, WM_SETTINGCHANGE,
-        };
-        let area: Vec<u16> = "Environment".encode_utf16().chain(once(0)).collect();
-        let mut result: usize = 0;
-        // SAFETY: `area` is a NUL-terminated UTF-16 string that outlives the call.
-        unsafe {
-            SendMessageTimeoutW(
-                HWND_BROADCAST,
-                WM_SETTINGCHANGE,
-                0,
-                area.as_ptr() as isize,
-                SMTO_ABORTIFHUNG,
-                5000,
-                &mut result,
-            );
+        loop {
+            while PENDING.swap(false, Ordering::SeqCst) {
+                send_setting_change();
+            }
+            RUNNING.store(false, Ordering::SeqCst);
+            // A call may have slipped in after the last send; take it over
+            // unless another thread already has.
+            if !PENDING.load(Ordering::SeqCst) || RUNNING.swap(true, Ordering::SeqCst) {
+                break;
+            }
         }
     });
+}
+
+fn send_setting_change() {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        HWND_BROADCAST, SMTO_ABORTIFHUNG, SendMessageTimeoutW, WM_SETTINGCHANGE,
+    };
+    let area: Vec<u16> = "Environment".encode_utf16().chain(once(0)).collect();
+    let mut result: usize = 0;
+    // SAFETY: `area` is a NUL-terminated UTF-16 string that outlives the call.
+    unsafe {
+        SendMessageTimeoutW(
+            HWND_BROADCAST,
+            WM_SETTINGCHANGE,
+            0,
+            area.as_ptr() as isize,
+            SMTO_ABORTIFHUNG,
+            5000,
+            &mut result,
+        );
+    }
 }
 
 /// Machine-level variables (read-only; reading HKLM needs no elevation),

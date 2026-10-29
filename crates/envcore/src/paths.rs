@@ -72,7 +72,8 @@ pub fn migrate_legacy(new_root: &Path, legacy: &[PathBuf]) -> Result<Vec<String>
             if name == "backups" {
                 let moved = BackupStore::new(&to).adopt_from(&from)?;
                 done.push(format!("moved {moved} backup(s) from {}", old.display()));
-            } else if !to.exists() && from.is_dir() && fs::rename(&from, &to).is_ok() {
+            } else if !to.exists() && fs::rename(&from, &to).is_ok() {
+                // Folders (sync, logs) and files (profiles.json, settings.json).
                 done.push(format!("moved {}", from.display()));
             }
         }
@@ -114,6 +115,8 @@ mod tests {
             .backup_file(&rc, "older")
             .unwrap();
         fs::create_dir_all(chreide.join("EBWebView")).unwrap();
+        // Files at the top of an old folder move too.
+        fs::write(env_mgr.join("profiles.json"), "{\"profiles\":[]}").unwrap();
         // The new folder already has logs (the log plugin starts first).
         fs::create_dir_all(new.join("logs")).unwrap();
         fs::write(new.join("logs/varden.log"), "x").unwrap();
@@ -128,6 +131,10 @@ mod tests {
         assert_eq!(
             fs::read_to_string(new.join("logs/varden.log")).unwrap(),
             "x"
+        );
+        assert_eq!(
+            fs::read_to_string(new.join("profiles.json")).unwrap(),
+            "{\"profiles\":[]}"
         );
         let backups = BackupStore::new(new.join("backups")).list().unwrap();
         assert_eq!(backups.len(), 2);

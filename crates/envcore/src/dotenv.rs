@@ -2,7 +2,7 @@
 //!
 //! Parsing follows what common dotenv loaders accept:
 //! `KEY=value`, an optional `export ` prefix, `#` comments, single-quoted
-//! (literal), double-quoted (with `\n`, `\t`, `\"`, `\\` escapes, may span
+//! (literal), double-quoted (with `\n`, `\t`, `\"`, `\\`, `\$` and `` \` `` escapes, may span
 //! lines) and backtick-quoted values, and inline `# comments` after
 //! unquoted values. `${VAR}` references are kept literally, not expanded.
 
@@ -161,7 +161,7 @@ fn take_quoted(s: &str, quote: char) -> Option<(String, &str)> {
                 'n' => value.push('\n'),
                 'r' => value.push('\r'),
                 't' => value.push('\t'),
-                '"' | '\\' | '$' => value.push(next),
+                '"' | '\\' | '$' | '`' => value.push(next),
                 other => {
                     value.push('\\');
                     value.push(other);
@@ -196,6 +196,8 @@ pub fn render_entry(e: &EnvEntry) -> String {
                 '\\' => esc.push_str("\\\\"),
                 '"' => esc.push_str("\\\""),
                 '$' => esc.push_str("\\$"),
+                // A shell that sources the file would run `...` as a command.
+                '`' => esc.push_str("\\`"),
                 '\n' => esc.push_str("\\n"),
                 '\r' => esc.push_str("\\r"),
                 c => esc.push(c),
@@ -298,6 +300,8 @@ mod tests {
             "both ' and \" and \\",
             "postgres://u:p@h/db?x=1",
             "ünïcødé ✓",
+            "it's `touch PWNED` and $(touch PWNED)",
+            "`touch PWNED`",
         ];
         let entries: Vec<EnvEntry> = values
             .iter()
@@ -322,5 +326,53 @@ mod tests {
         }];
         write_file(&path, &entries).unwrap();
         assert_eq!(read_file(&path).unwrap().entries, entries);
+    }
+
+    /// Exported files are often sourced by a shell (`set -a; . ./.env`).
+    /// That must give back the exact values and never run anything.
+    #[cfg(unix)]
+    #[test]
+    fn sourcing_an_export_runs_nothing() {
+        let Ok(sh) = which::which("bash") else {
+            return;
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let values = [
+            "it's `touch PWNED` here",
+            "it's $(touch PWNED) here",
+            "line one\nit's `touch PWNED`",
+            "back\\slash and \"quote\" and it's",
+        ];
+        let entries: Vec<EnvEntry> = values
+            .iter()
+            .enumerate()
+            .map(|(i, v)| EnvEntry {
+                key: format!("K{i}"),
+                value: v.to_string(),
+            })
+            .collect();
+        let file = dir.path().join(".env");
+        write_file(&file, &entries).unwrap();
+        let out = std::process::Command::new(sh)
+            .current_dir(dir.path())
+            .arg("-c")
+            .arg("set -a; . ./.env; printf '%s\\0' \"$K0\" \"$K1\" \"$K3\"")
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(
+            !dir.path().join("PWNED").exists(),
+            "sourcing the file ran a command"
+        );
+        let got: Vec<&str> = std::str::from_utf8(&out.stdout)
+            .unwrap()
+            .split('\0')
+            .filter(|s| !s.is_empty())
+            .collect();
+        assert_eq!(got, [values[0], values[1], values[3]]);
     }
 }
