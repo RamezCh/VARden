@@ -197,8 +197,11 @@ mod tests {
             assert_eq!(s, Source::File);
             *h.lock().unwrap() += 1;
         });
+        // macOS may deliver events that were queued while the watcher was
+        // being installed. Wait for the full debounce window before starting
+        // the assertions so those startup events are not mistaken for reads.
+        std::thread::sleep(MAX_DELAY + SETTLE);
         let settle = || std::thread::sleep(SETTLE * 3);
-        settle();
 
         let _ = std::fs::read_to_string(&rc).unwrap();
         std::fs::write(&other, "x").unwrap();
