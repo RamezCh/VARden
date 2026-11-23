@@ -201,6 +201,7 @@ mod tests {
         // being installed. Wait for the full debounce window before starting
         // the assertions so those startup events are not mistaken for reads.
         std::thread::sleep(MAX_DELAY + SETTLE);
+        *hits.lock().unwrap() = 0;
         let settle = || std::thread::sleep(SETTLE * 3);
 
         let _ = std::fs::read_to_string(&rc).unwrap();
